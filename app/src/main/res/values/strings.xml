@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Dynamic Frame</string>
+    <string name="app_description">Marco digital dinámico para TV</string>
+    <string name="settings">Configuración</string>
+    <string name="slideshow">Slideshow</string>
+    <string name="play">Reproducir</string>
+    <string name="pause">Pausar</string>
+    <string name="next">Siguiente</string>
+    <string name="previous">Anterior</string>
+    <string name="volume">Volumen</string>
+    <string name="music">Música</string>
+    <string name="loading">Cargando...</string>
+    <string name="no_media">No se encontraron fotos o videos</string>
+    <string name="permission_required">Se necesitan permisos para acceder a los medios</string>
+</resources>

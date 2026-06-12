@@ -1,0 +1,12 @@
+---
+description: DynamicFrame versiona con version.properties; subir PATCH al entregar cambios
+alwaysApply: true
+---
+
+# Versión de DynamicFrame (x.y.z)
+
+- Fuente: `app/version.properties` (no editar `versionName` a mano en `build.gradle.kts`).
+- **Compilar no sube la versión.** `assemble*`, `compile*Kotlin`, `install*` leen el valor actual sin modificarlo.
+- Subir versión **solo al entregar cambios de código**: ejecutar `./gradlew :app:bumpVersion` o editar `version.properties` a mano.
+- PATCH 0–100; al llegar a 100 → MIDDLE+1, PATCH=0; si MIDDLE=100 → MAJOR+1, MIDDLE=0.
+- Documentar entregas en `CHANGELOG.md` con `## vX.Y.Z`, usando **Añadido** / **Actualizado** / **Corregido** / **Eliminado**.
