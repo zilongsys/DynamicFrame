@@ -15,7 +15,8 @@ import javax.inject.Singleton
 
 @Singleton
 class DocumentFolderScanner @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val filePathScanner: FilePathFolderScanner
 ) {
 
     fun scanMediaFolders(
@@ -24,6 +25,10 @@ class DocumentFolderScanner @Inject constructor(
     ): List<MediaItem> {
         val items = mutableListOf<MediaItem>()
         folderUris.forEach { uriString ->
+            if (uriString.startsWith("file:")) {
+                items.addAll(filePathScanner.scanMediaFolder(uriString, filter))
+                return@forEach
+            }
             val treeUri = Uri.parse(uriString)
             val root = DocumentFile.fromTreeUri(context, treeUri) ?: return@forEach
             scanMediaRecursive(root, filter, items, root.name ?: "Carpeta")
@@ -33,6 +38,9 @@ class DocumentFolderScanner @Inject constructor(
     }
 
     fun scanMusicFolder(folderUri: String): List<MusicTrack> {
+        if (folderUri.startsWith("file:")) {
+            return filePathScanner.scanMusicFolder(folderUri)
+        }
         val treeUri = Uri.parse(folderUri)
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
         val tracks = mutableListOf<MusicTrack>()

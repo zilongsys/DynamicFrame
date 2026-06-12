@@ -1,5 +1,14 @@
 # Changelog — DynamicFrame
 
+## v0.1.2
+
+### Añadido
+- Explorador de carpetas integrado para TV box (sin depender de otra app para SAF).
+- Atajos: Almacenamiento interno, Imágenes, DCIM, Descargas, USB/SD.
+
+### Corregido
+- «No hay app para abrir ficheros» al elegir carpeta en Android TV.
+
 ## v0.1.1
 
 ### Corregido

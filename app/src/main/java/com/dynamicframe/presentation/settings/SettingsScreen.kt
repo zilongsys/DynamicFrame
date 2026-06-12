@@ -26,7 +26,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dynamicframe.data.local.LocalStorageBrowser
 import com.dynamicframe.domain.model.*
+import com.dynamicframe.presentation.browser.FolderBrowserDialog
+import com.dynamicframe.presentation.browser.StoragePicker
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -43,6 +46,10 @@ fun SettingsScreen(
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     val device = LocalDeviceProfile.current
     val context = LocalContext.current
+    var showMediaFolderBrowser by remember { mutableStateOf(false) }
+    var showMusicFolderBrowser by remember { mutableStateOf(false) }
+    val useInAppBrowser = StoragePicker.shouldUseInAppBrowser(device.isTv, context)
+    val systemPickerAvailable = StoragePicker.isSystemFolderPickerAvailable(context)
 
     val mediaFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -70,14 +77,39 @@ fun SettingsScreen(
     }
 
     fun openMediaFolderPicker() {
-        val launch = { mediaFolderLauncher.launch(null) }
-        if (requestMediaAccess != null) requestMediaAccess(launch) else launch()
+        val action = {
+            if (useInAppBrowser) showMediaFolderBrowser = true
+            else mediaFolderLauncher.launch(null)
+        }
+        if (requestMediaAccess != null) requestMediaAccess(action) else action()
     }
 
     fun openMusicFolderPicker() {
-        val launch = { musicFolderLauncher.launch(null) }
-        if (requestMusicAccess != null) requestMusicAccess(launch) else launch()
+        val action = {
+            if (useInAppBrowser) showMusicFolderBrowser = true
+            else musicFolderLauncher.launch(null)
+        }
+        if (requestMusicAccess != null) requestMusicAccess(action) else action()
     }
+
+    FolderBrowserDialog(
+        visible = showMediaFolderBrowser,
+        title = "Carpeta de fotos y vídeos",
+        onDismiss = { showMediaFolderBrowser = false },
+        onSelectFolder = { uri ->
+            viewModel.addMediaFolder(uri)
+            onMediaChanged()
+        }
+    )
+
+    FolderBrowserDialog(
+        visible = showMusicFolderBrowser,
+        title = "Carpeta de música",
+        onDismiss = { showMusicFolderBrowser = false },
+        onSelectFolder = { uri ->
+            viewModel.setMusicFolder(uri)
+        }
+    )
 
     Scaffold(
         modifier = modifier.then(if (embedded) Modifier.fillMaxSize() else Modifier),
@@ -257,7 +289,11 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 SettingsSectionHeader("Carpetas de fotos y videos", Icons.Default.Folder)
                 Text(
-                    text = "Incluye subcarpetas. Sin carpeta = galería del dispositivo.",
+                    text = if (useInAppBrowser) {
+                        "Explorador integrado (no requiere otra app). Sin carpeta = galería del dispositivo."
+                    } else {
+                        "Incluye subcarpetas. Sin carpeta = galería del dispositivo."
+                    },
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 8.dp)
@@ -271,7 +307,27 @@ fun SettingsScreen(
                 ) {
                     Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(if (device.isTv) 24.dp else 20.dp))
                     Spacer(Modifier.width(8.dp))
-                    Text(if (device.isTv) "Elegir carpeta de medios" else "Carpeta de medios")
+                    Text(
+                        if (useInAppBrowser) "Explorar carpetas (integrado)"
+                        else if (device.isTv) "Elegir carpeta de medios"
+                        else "Carpeta de medios"
+                    )
+                }
+            }
+
+            if (!useInAppBrowser && systemPickerAvailable) {
+                item {
+                    OutlinedButton(
+                        onClick = {
+                            val launch = { mediaFolderLauncher.launch(null) }
+                            if (requestMediaAccess != null) requestMediaAccess(launch) else launch()
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Default.FolderOpen, contentDescription = null)
+                        Spacer(Modifier.width(8.dp))
+                        Text("Selector del sistema")
+                    }
                 }
             }
 
@@ -758,10 +814,7 @@ fun VideoMusicBehavior.displayName() = when (this) {
     VideoMusicBehavior.DUCK -> "Bajar volumen"
 }
 
-private fun folderLabel(uriString: String): String {
-    val uri = Uri.parse(uriString)
-    return uri.lastPathSegment?.replace(':', ' ') ?: "Carpeta"
-}
+fun folderLabel(uriString: String): String = LocalStorageBrowser.folderDisplayName(uriString)
 
 @Composable
 fun FolderChip(label: String, onRemove: () -> Unit) {

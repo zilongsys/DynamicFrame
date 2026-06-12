@@ -170,8 +170,6 @@ class SlideshowViewModel @Inject constructor(
         return pills
     }
 
-    private fun folderLabel(uriString: String): String {
-        val segment = Uri.parse(uriString).lastPathSegment ?: return "Carpeta"
-        return segment.replace(':', ' ').take(24)
-    }
+    private fun folderLabel(uriString: String): String =
+        com.dynamicframe.data.local.LocalStorageBrowser.folderDisplayName(uriString)
 }

@@ -37,9 +37,12 @@ import com.dynamicframe.BuildConfig
 import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.SlideshowConfig
+import com.dynamicframe.presentation.browser.FolderBrowserDialog
+import com.dynamicframe.presentation.browser.StoragePicker
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
 import com.dynamicframe.presentation.permissions.rememberMediaPermissions
 import com.dynamicframe.presentation.settings.SettingsScreen
+import com.dynamicframe.presentation.settings.folderLabel
 import com.dynamicframe.presentation.settings.SettingsViewModel
 import com.dynamicframe.presentation.settings.SettingsDropdownItem
 import com.dynamicframe.presentation.settings.SettingsSliderItem
@@ -812,6 +815,9 @@ private fun MusicPanel(
 ) {
     val permissions = rememberMediaPermissions()
     val context = LocalContext.current
+    val device = LocalDeviceProfile.current
+    var showMusicFolderBrowser by remember { mutableStateOf(false) }
+    val useInAppBrowser = StoragePicker.shouldUseInAppBrowser(device.isTv, context)
 
     val musicFolderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
@@ -824,6 +830,15 @@ private fun MusicPanel(
             onUpdateConfig(config.copy(musicFolderUri = it.toString()))
         }
     }
+
+    FolderBrowserDialog(
+        visible = showMusicFolderBrowser,
+        title = "Carpeta de música",
+        onDismiss = { showMusicFolderBrowser = false },
+        onSelectFolder = { uri ->
+            onUpdateConfig(config.copy(musicFolderUri = uri))
+        }
+    )
 
     LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
         item {
@@ -858,7 +873,8 @@ private fun MusicPanel(
                 OutlinedButton(
                     onClick = {
                         permissions.requestFor(MediaPermissionKind.MUSIC) {
-                            musicFolderLauncher.launch(null)
+                            if (useInAppBrowser) showMusicFolderBrowser = true
+                            else musicFolderLauncher.launch(null)
                         }
                     },
                     modifier = Modifier.fillMaxWidth()
@@ -866,8 +882,11 @@ private fun MusicPanel(
                     Icon(Icons.Default.FolderOpen, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
                     Text(
-                        if (config.musicFolderUri != null) "Cambiar carpeta de música"
-                        else "Elegir carpeta de música"
+                        when {
+                            config.musicFolderUri != null -> "Cambiar: ${folderLabel(config.musicFolderUri!!)}"
+                            useInAppBrowser -> "Explorar carpeta de música"
+                            else -> "Elegir carpeta de música"
+                        }
                     )
                 }
             }
