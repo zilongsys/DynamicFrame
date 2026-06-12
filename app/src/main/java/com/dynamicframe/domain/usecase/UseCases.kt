@@ -95,3 +95,10 @@ class GetSlideshowConfigUseCase @Inject constructor(
     suspend operator fun invoke(): SlideshowConfig =
         settingsRepository.getConfig()
 }
+
+class DeleteMediaItemUseCase @Inject constructor(
+    private val mediaRepository: MediaRepository
+) {
+    suspend operator fun invoke(item: MediaItem): Result<Unit> =
+        mediaRepository.deleteMediaItem(item)
+}

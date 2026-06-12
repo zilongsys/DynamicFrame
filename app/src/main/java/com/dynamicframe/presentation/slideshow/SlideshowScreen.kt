@@ -30,6 +30,7 @@ import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import com.dynamicframe.domain.model.ClockPosition
 import com.dynamicframe.domain.model.MediaType
+import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.*
 import com.dynamicframe.ui.theme.requestFocusWhenReady
@@ -50,6 +51,24 @@ fun SlideshowScreen(
     val musicState by viewModel.musicState.collectAsStateWithLifecycle()
     val albumPills by viewModel.albumPills.collectAsStateWithLifecycle()
     val selectedAlbumId by viewModel.selectedAlbumId.collectAsStateWithLifecycle()
+    val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
+    val snackbarHostState = remember { SnackbarHostState() }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            viewModel.clearToast()
+        }
+    }
+
+    ConfirmDeleteDialog(
+        visible = showDeleteConfirm,
+        title = "¿Borrar esta foto o vídeo?",
+        message = "Se eliminará del dispositivo. Esta acción no se puede deshacer.",
+        onConfirm = { viewModel.deleteCurrentSlide() },
+        onDismiss = { showDeleteConfirm = false }
+    )
 
     val immersive = config.playbackImmersiveMode
     var showControls by remember(immersive, isTV) {
@@ -95,9 +114,14 @@ fun SlideshowScreen(
         }
     }
 
+    Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
+        containerColor = Color.Black
+    ) { padding ->
     Box(
         modifier = Modifier
             .fillMaxSize()
+            .padding(padding)
             .background(Color.Black)
             .tvFocusRequester(screenFocus)
             .onKeyEvent { event ->
@@ -202,6 +226,14 @@ fun SlideshowScreen(
                                 contentDescription = "Volver",
                                 label = if (device.isTv) "Inicio" else "Volver",
                                 onClick = onBack
+                            )
+                        }
+                        if (slideshowState.currentItem != null) {
+                            GlassIconButton(
+                                icon = Icons.Default.DeleteOutline,
+                                contentDescription = "Borrar",
+                                label = if (device.isTv) "Borrar" else null,
+                                onClick = { showDeleteConfirm = true }
                             )
                         }
                         GlassIconButton(
@@ -335,6 +367,7 @@ fun SlideshowScreen(
                 )
             }
         }
+    }
     }
 }
 

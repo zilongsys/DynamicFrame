@@ -6,24 +6,42 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
 import com.dynamicframe.presentation.device.typographyForDevice
 
-val PaperBackground = Color(0xFFF3F0EA)
-val PaperSurface = Color(0xFFFAF8F4)
-val PaperInk = Color(0xFF1A1A1A)
-val PaperMuted = Color(0xFF6B6560)
-val PaperLine = Color(0xFFD8D2C8)
-val PaperAccent = Color(0xFF2C2C2C)
-val PaperSelected = Color(0xFFFFFFFF)
+// Paleta nostálgica — rosa suave, crema y ciruela
+val NostalgiaBackground = Color(0xFFFFF5F7)
+val NostalgiaSurface = Color(0xFFFFFBFC)
+val NostalgiaCard = Color(0xFFFFE8EF)
+val NostalgiaInk = Color(0xFF4A2C3D)
+val NostalgiaMuted = Color(0xFF9A7082)
+val NostalgiaLine = Color(0xFFF5C6D6)
+val NostalgiaAccent = Color(0xFFD4738F)
+val NostalgiaAccentDeep = Color(0xFFB85C78)
+val NostalgiaSelected = Color(0xFFFFD9E6)
+val NostalgiaFocus = Color(0xFFC75B7A)
+val NostalgiaGlow = Color(0xFFFFB8D0)
 
-private val EditorialColorScheme = lightColorScheme(
-    primary = PaperInk,
-    onPrimary = PaperSurface,
-    background = PaperBackground,
-    onBackground = PaperInk,
-    surface = PaperSurface,
-    onSurface = PaperInk,
-    surfaceVariant = Color(0xFFE8E4DC),
-    onSurfaceVariant = PaperMuted,
-    outline = PaperLine
+// Alias para compatibilidad con pantallas existentes
+val PaperBackground = NostalgiaBackground
+val PaperSurface = NostalgiaSurface
+val PaperInk = NostalgiaInk
+val PaperMuted = NostalgiaMuted
+val PaperLine = NostalgiaLine
+val PaperAccent = NostalgiaAccentDeep
+val PaperSelected = NostalgiaSelected
+
+private val NostalgiaColorScheme = lightColorScheme(
+    primary = NostalgiaAccentDeep,
+    onPrimary = Color.White,
+    secondary = NostalgiaAccent,
+    onSecondary = Color.White,
+    background = NostalgiaBackground,
+    onBackground = NostalgiaInk,
+    surface = NostalgiaSurface,
+    onSurface = NostalgiaInk,
+    surfaceVariant = NostalgiaCard,
+    onSurfaceVariant = NostalgiaMuted,
+    outline = NostalgiaLine,
+    error = Color(0xFFC62828),
+    onError = Color.White
 )
 
 @Composable
@@ -32,7 +50,7 @@ fun DynamicFrameTheme(
     content: @Composable () -> Unit
 ) {
     MaterialTheme(
-        colorScheme = EditorialColorScheme,
+        colorScheme = NostalgiaColorScheme,
         typography = typographyForDevice(isTv),
         content = content
     )

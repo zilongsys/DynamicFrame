@@ -5,8 +5,8 @@ import android.content.ContentUris
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
-import android.os.Build
 import android.provider.MediaStore
+import androidx.documentfile.provider.DocumentFile
 import com.dynamicframe.domain.model.MediaContentFilter
 import com.dynamicframe.domain.model.*
 import com.dynamicframe.domain.repository.MediaRepository
@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.withContext
+import java.io.File
+import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -297,4 +299,27 @@ class LocalMediaRepository @Inject constructor(
     override fun observeLocalMedia(): Flow<List<MediaItem>> = flow {
         emit(getAllMediaItems(listOf(MediaSource.LOCAL)).getOrDefault(emptyList()))
     }.flowOn(Dispatchers.IO)
+
+    override suspend fun deleteMediaItem(item: MediaItem): Result<Unit> = withContext(Dispatchers.IO) {
+        runCatching {
+            val uri = item.uri
+            when (uri.scheme) {
+                "file" -> {
+                    val path = uri.path ?: throw IOException("Ruta inválida")
+                    val file = File(path)
+                    if (!file.exists() || !file.delete()) {
+                        throw IOException("No se pudo borrar el archivo")
+                    }
+                }
+                "content" -> {
+                    val rows = contentResolver.delete(uri, null, null)
+                    if (rows > 0) return@runCatching
+                    val doc = DocumentFile.fromSingleUri(context, uri)
+                    if (doc != null && doc.delete()) return@runCatching
+                    throw IOException("No se pudo borrar. Puede requerir permiso del sistema.")
+                }
+                else -> throw IOException("Tipo de archivo no soportado para borrar")
+            }
+        }
+    }
 }

@@ -8,10 +8,13 @@ import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.repository.SettingsRepository
+import com.dynamicframe.domain.model.MediaItem
+import com.dynamicframe.domain.usecase.DeleteMediaItemUseCase
 import com.dynamicframe.domain.usecase.GetLocalAlbumsUseCase
 import com.dynamicframe.domain.usecase.GetMusicTracksUseCase
 import com.dynamicframe.domain.usecase.GetSlideshowConfigUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -25,8 +28,12 @@ class SlideshowViewModel @Inject constructor(
     private val getMusicTracks: GetMusicTracksUseCase,
     private val getConfig: GetSlideshowConfigUseCase,
     private val getLocalAlbums: GetLocalAlbumsUseCase,
+    private val deleteMediaItem: DeleteMediaItemUseCase,
     private val settingsRepository: SettingsRepository
 ) : ViewModel() {
+
+    private val _toastMessage = MutableStateFlow<String?>(null)
+    val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
 
     val slideshowState = slideshowEngine.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), slideshowEngine.state.value)
@@ -150,6 +157,24 @@ class SlideshowViewModel @Inject constructor(
     }
 
     fun skipNextTrack() = musicController.skipNext()
+
+    fun clearToast() {
+        _toastMessage.value = null
+    }
+
+    fun deleteItem(item: MediaItem) {
+        viewModelScope.launch {
+            deleteMediaItem(item)
+                .onSuccess { slideshowEngine.removeItem(item.id) }
+                .onFailure { e ->
+                    _toastMessage.value = e.message ?: "No se pudo borrar el archivo"
+                }
+        }
+    }
+
+    fun deleteCurrentSlide() {
+        slideshowState.value.currentItem?.let { deleteItem(it) }
+    }
 
     // SlideshowEngine y MusicPlayerController son @Singleton de app: no destruir al salir de una pantalla.
     override fun onCleared() {

@@ -131,6 +131,38 @@ class SlideshowEngine @Inject constructor(
 
     fun selectPreviewIndex(index: Int) = jumpTo(index)
 
+    fun removeItem(itemId: String) {
+        val removeIndex = _state.value.currentIndex
+        mediaItems = mediaItems.filter { it.id != itemId }
+        shuffledItems = shuffledItems.filter { it.id != itemId }
+
+        if (shuffledItems.isEmpty()) {
+            timerJob?.cancel()
+            _state.value = _state.value.copy(
+                currentItem = null,
+                currentIndex = 0,
+                totalItems = 0,
+                allItems = emptyList(),
+                playlistItems = emptyList(),
+                nextItem = null,
+                error = "No hay fotos o videos. Configura carpetas en Ajustes."
+            )
+            return
+        }
+
+        val newIndex = removeIndex.coerceIn(0, shuffledItems.lastIndex)
+        _state.value = _state.value.copy(
+            totalItems = mediaItems.size,
+            allItems = mediaItems,
+            playlistItems = shuffledItems,
+            currentIndex = newIndex,
+            currentItem = shuffledItems[newIndex],
+            isTransitioning = false
+        )
+        preloadNext(newIndex)
+        if (_state.value.isPlaying) scheduleNext()
+    }
+
     fun onVideoCompleted() {
         if (!_state.value.isPlaying) return
         val nextIdx = nextIndex()

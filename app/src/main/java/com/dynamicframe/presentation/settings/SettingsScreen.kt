@@ -30,6 +30,7 @@ import com.dynamicframe.data.local.LocalStorageBrowser
 import com.dynamicframe.domain.model.*
 import com.dynamicframe.presentation.browser.FolderBrowserDialog
 import com.dynamicframe.presentation.browser.StoragePicker
+import com.dynamicframe.ui.theme.NostalgiaActionButton
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -301,18 +302,13 @@ fun SettingsScreen(
             }
 
             item {
-                OutlinedButton(
-                    onClick = { openMediaFolderPicker() },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.CreateNewFolder, contentDescription = null, modifier = Modifier.size(if (device.isTv) 24.dp else 20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        if (useInAppBrowser) "Explorar carpetas (integrado)"
-                        else if (device.isTv) "Elegir carpeta de medios"
-                        else "Carpeta de medios"
-                    )
-                }
+                NostalgiaActionButton(
+                    text = if (useInAppBrowser) "Explorar carpetas (integrado)"
+                    else if (device.isTv) "Elegir carpeta de medios"
+                    else "Carpeta de medios",
+                    icon = Icons.Default.CreateNewFolder,
+                    onClick = { openMediaFolderPicker() }
+                )
             }
 
             if (!useInAppBrowser && systemPickerAvailable) {
@@ -332,17 +328,14 @@ fun SettingsScreen(
             }
 
             item {
-                OutlinedButton(
+                NostalgiaActionButton(
+                    text = if (device.isTv) "Usar galería del dispositivo" else "Galería del dispositivo",
+                    icon = Icons.Default.Collections,
                     onClick = {
                         val grant = { onMediaChanged() }
                         if (requestMediaAccess != null) requestMediaAccess(grant) else grant()
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Icon(Icons.Default.Collections, contentDescription = null, modifier = Modifier.size(if (device.isTv) 24.dp else 20.dp))
-                    Spacer(Modifier.width(8.dp))
-                    Text(if (device.isTv) "Usar galería del dispositivo" else "Galería del dispositivo")
-                }
+                    }
+                )
             }
 
             items(config.mediaFolderUris) { uri ->
@@ -434,17 +427,15 @@ fun SettingsScreen(
 
             if (config.musicSourceType == MusicSourceType.LOCAL_FOLDER) {
                 item {
-                    OutlinedButton(
-                        onClick = { openMusicFolderPicker() },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text(
-                            if (config.musicFolderUri != null) folderLabel(config.musicFolderUri!!)
-                            else "Elegir carpeta de música"
-                        )
-                    }
+                    NostalgiaActionButton(
+                        text = if (config.musicFolderUri != null) {
+                            "Música: ${folderLabel(config.musicFolderUri!!)}"
+                        } else {
+                            "Elegir carpeta de música"
+                        },
+                        icon = Icons.Default.FolderOpen,
+                        onClick = { openMusicFolderPicker() }
+                    )
                 }
             }
 

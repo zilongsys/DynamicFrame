@@ -24,7 +24,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-private val TvFocusColor = Color(0xFF1A56DB)
+private val TvFocusColor = Color(0xFFC75B7A)
 
 /** Foco + D-pad/OK para Android TV y TV box. */
 @Composable

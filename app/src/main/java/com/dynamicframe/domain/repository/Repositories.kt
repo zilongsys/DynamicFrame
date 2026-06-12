@@ -12,6 +12,7 @@ interface MediaRepository {
         filter: MediaContentFilter
     ): Result<List<MediaItem>>
     fun observeLocalMedia(): Flow<List<MediaItem>>
+    suspend fun deleteMediaItem(item: MediaItem): Result<Unit>
 }
 
 interface MusicRepository {

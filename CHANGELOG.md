@@ -1,5 +1,15 @@
 # Changelog — DynamicFrame
 
+## v0.1.3
+
+### Añadido
+- Borrar foto o vídeo desde la app (panel y pantalla completa) con confirmación.
+- Tema nostálgico rosa: UI renovada en inicio, ajustes y slideshow.
+
+### Actualizado
+- Foco D-pad en botones de ajustes, diálogos y controles del slideshow.
+- Gradiente aurora rosa en modo reproducción.
+
 ## v0.1.2
 
 ### Añadido

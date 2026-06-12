@@ -6,6 +6,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import com.dynamicframe.presentation.device.LocalDeviceProfile
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
@@ -33,10 +34,10 @@ val GlassTextMuted = Color.White.copy(alpha = 0.72f)
 
 private val AuroraGradient = Brush.linearGradient(
     colors = listOf(
-        Color(0xFF5B86E5),
-        Color(0xFF36D1DC),
-        Color(0xFF8E54E9),
-        Color(0xFFFF6B9D)
+        Color(0xFF4A2C3D),
+        Color(0xFFB85C78),
+        Color(0xFFE8A0BF),
+        Color(0xFFFFF0F3)
     )
 )
 
@@ -53,10 +54,10 @@ fun AuroraBackground(modifier: Modifier = Modifier) {
         modifier = modifier.background(
             Brush.linearGradient(
                 colors = listOf(
-                    Color(0xFF4158D0),
-                    Color(0xFF6A82FB).copy(alpha = 0.85f + shift * 0.15f),
-                    Color(0xFFC850C0),
-                    Color(0xFFFFCC70)
+                    Color(0xFF3D2230),
+                    Color(0xFF8E4A62).copy(alpha = 0.9f + shift * 0.1f),
+                    Color(0xFFD4738F),
+                    Color(0xFFFFD6E6)
                 )
             )
         )
@@ -99,6 +100,7 @@ fun GlassAlbumPill(
         else -> GlassBorder
     }
 
+    val device = LocalDeviceProfile.current
     Box(
         modifier = modifier
             .height(40.dp)
@@ -109,12 +111,16 @@ fun GlassAlbumPill(
                 color = borderColor,
                 shape = RoundedCornerShape(50)
             )
-            .focusable()
-            .onFocusChanged { focused = it.isFocused }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
+            .then(
+                if (device.isTv) Modifier.safeClickable(onClick = onClick, showFocusBorder = false)
+                else Modifier
+                    .focusable()
+                    .onFocusChanged { focused = it.isFocused }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onClick
+                    )
             )
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center
@@ -161,6 +167,7 @@ fun GlassIconButton(
     prominent: Boolean = false
 ) {
     var focused by remember { mutableStateOf(false) }
+    val device = LocalDeviceProfile.current
     val shape = RoundedCornerShape(16.dp)
     val bg = if (prominent) GlassWhiteStrong else GlassWhite
 
@@ -173,12 +180,16 @@ fun GlassIconButton(
                 color = if (focused) Color.White else GlassBorder,
                 shape = shape
             )
-            .focusable()
-            .onFocusChanged { focused = it.isFocused }
-            .clickable(
-                interactionSource = remember { MutableInteractionSource() },
-                indication = null,
-                onClick = onClick
+            .then(
+                if (device.isTv) Modifier.safeClickable(onClick = onClick, showFocusBorder = false)
+                else Modifier
+                    .focusable()
+                    .onFocusChanged { focused = it.isFocused }
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = onClick
+                    )
             )
             .padding(horizontal = if (label != null) 14.dp else 10.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -198,20 +209,14 @@ fun GlassCircleButton(
     modifier: Modifier = Modifier,
     onClick: () -> Unit
 ) {
-    var focused by remember { mutableStateOf(false) }
-    IconButton(
-        onClick = onClick,
+    Box(
         modifier = modifier
             .size(44.dp)
             .clip(CircleShape)
-            .background(if (focused) GlassWhiteStrong else GlassWhite)
-            .border(
-                width = if (focused) 2.dp else 1.dp,
-                color = if (focused) Color.White else GlassBorder,
-                shape = CircleShape
-            )
-            .focusable()
-            .onFocusChanged { focused = it.isFocused }
+            .background(GlassWhite)
+            .border(1.dp, GlassBorder, CircleShape)
+            .safeClickable(onClick = onClick, showFocusBorder = false),
+        contentAlignment = Alignment.Center
     ) {
         Icon(icon, contentDescription = contentDescription, tint = GlassText)
     }

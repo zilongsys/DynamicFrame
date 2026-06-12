@@ -22,6 +22,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -51,7 +52,10 @@ import com.dynamicframe.presentation.device.HomeSection
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.presentation.device.navLabel
 import com.dynamicframe.presentation.slideshow.AlbumPillOption
+import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.slideshow.SlideshowViewModel
+import com.dynamicframe.ui.theme.NostalgiaAccent
+import com.dynamicframe.ui.theme.NostalgiaCard
 import com.dynamicframe.ui.theme.PaperBackground
 import com.dynamicframe.ui.theme.PaperInk
 import com.dynamicframe.ui.theme.PaperLine
@@ -88,6 +92,8 @@ fun HomeScreen(
 
     var currentTime by remember { mutableStateOf("") }
     var currentDate by remember { mutableStateOf("") }
+    var showDeleteConfirm by remember { mutableStateOf(false) }
+    val toastMessage by slideshowViewModel.toastMessage.collectAsStateWithLifecycle()
 
     LaunchedEffect(Unit) {
         while (true) {
@@ -97,6 +103,22 @@ fun HomeScreen(
             delay(1000)
         }
     }
+
+    val snackbarHostState = remember { SnackbarHostState() }
+    LaunchedEffect(toastMessage) {
+        toastMessage?.let {
+            snackbarHostState.showSnackbar(it)
+            slideshowViewModel.clearToast()
+        }
+    }
+
+    ConfirmDeleteDialog(
+        visible = showDeleteConfirm,
+        title = "¿Borrar esta foto o vídeo?",
+        message = "Se eliminará del dispositivo. Esta acción no se puede deshacer.",
+        onConfirm = { slideshowViewModel.deleteCurrentSlide() },
+        onDismiss = { showDeleteConfirm = false }
+    )
 
     val mainContent: @Composable () -> Unit = {
         when (section) {
@@ -117,10 +139,12 @@ fun HomeScreen(
                 onSkipTrack = slideshowViewModel::skipNextTrack,
                 onSelectThumbnail = slideshowViewModel::jumpToSlide,
                 onOpenFullscreen = onOpenFullscreen,
+                onDeleteCurrent = { showDeleteConfirm = true },
                 onIntervalChange = settingsViewModel::updateInterval,
                 largeClockToggle = { largeClock = it },
                 sidebarVisible = sidebarVisible,
-                onSidebarToggle = { sidebarVisible = it }
+                onSidebarToggle = { sidebarVisible = it },
+                canDelete = slideshowState.currentItem != null
             )
 
             HomeSection.ALBUMS -> AlbumsPanel(
@@ -149,42 +173,49 @@ fun HomeScreen(
     }
 
     if (device.useSidebarNav) {
-        Row(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PaperBackground)
-                .then(if (device.isTv) Modifier.focusGroup() else Modifier)
-        ) {
-            if (sidebarVisible) {
-                EditorialSidebar(
-                    selected = section,
-                    photoCount = slideshowState.totalItems,
-                    currentIndex = slideshowState.currentIndex,
-                    onSelect = { section = it }
-                )
-            }
-            Column(
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = PaperBackground
+        ) { padding ->
+            Row(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxHeight()
-                    .padding(
-                        horizontal = device.contentPaddingH,
-                        vertical = device.contentPaddingV
-                    )
+                    .fillMaxSize()
+                    .padding(padding)
+                    .then(if (device.isTv) Modifier.focusGroup() else Modifier)
             ) {
-                mainContent()
+                if (sidebarVisible) {
+                    EditorialSidebar(
+                        selected = section,
+                        photoCount = slideshowState.totalItems,
+                        currentIndex = slideshowState.currentIndex,
+                        onSelect = { section = it }
+                    )
+                }
+                Column(
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                        .padding(
+                            horizontal = device.contentPaddingH,
+                            vertical = device.contentPaddingV
+                        )
+                ) {
+                    mainContent()
+                }
             }
         }
     } else {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .background(PaperBackground)
-        ) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(snackbarHostState) },
+            containerColor = PaperBackground,
+            bottomBar = {
+                PhoneBottomNav(selected = section, onSelect = { section = it })
+            }
+        ) { padding ->
             Column(
                 modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+                    .fillMaxSize()
+                    .padding(padding)
                     .padding(
                         horizontal = device.contentPaddingH,
                         vertical = device.contentPaddingV
@@ -192,10 +223,6 @@ fun HomeScreen(
             ) {
                 mainContent()
             }
-            PhoneBottomNav(
-                selected = section,
-                onSelect = { section = it }
-            )
         }
     }
 }
@@ -221,7 +248,11 @@ private fun EditorialSidebar(
         modifier = Modifier
             .width(device.sidebarWidth)
             .fillMaxHeight()
-            .background(PaperSurface)
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(NostalgiaCard, PaperSurface, PaperBackground)
+                )
+            )
             .padding(horizontal = 20.dp, vertical = 28.dp),
         verticalArrangement = Arrangement.SpaceBetween
     ) {
@@ -229,10 +260,17 @@ private fun EditorialSidebar(
             Text(
                 text = "DYNFRAME",
                 style = MaterialTheme.typography.labelSmall,
-                color = PaperMuted,
-                letterSpacing = 3.sp
+                color = NostalgiaAccent,
+                letterSpacing = 4.sp,
+                fontWeight = FontWeight.SemiBold
             )
-            Spacer(Modifier.height(32.dp))
+            Text(
+                text = "recuerdos · música · marco",
+                fontSize = 11.sp,
+                color = PaperMuted,
+                letterSpacing = 0.5.sp
+            )
+            Spacer(Modifier.height(28.dp))
             HomeSection.entries.forEachIndexed { index, item ->
                 SidebarItem(
                     label = item.navLabel(device.isTv),
@@ -328,8 +366,13 @@ private fun SidebarItem(
         modifier = modifier
             .fillMaxWidth()
             .heightIn(min = if (device.isTv) 52.dp else 44.dp)
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(if (selected) PaperSelected else Color.Transparent)
+            .border(
+                width = if (selected) 1.dp else 0.dp,
+                color = if (selected) NostalgiaAccent.copy(alpha = 0.35f) else Color.Transparent,
+                shape = RoundedCornerShape(20.dp)
+            )
             .safeClickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = if (device.isTv) 14.dp else 10.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -367,10 +410,12 @@ private fun SlideshowPanel(
     onSkipTrack: () -> Unit,
     onSelectThumbnail: (Int) -> Unit,
     onOpenFullscreen: () -> Unit,
+    onDeleteCurrent: () -> Unit,
     onIntervalChange: (Int) -> Unit,
     largeClockToggle: (Boolean) -> Unit,
     sidebarVisible: Boolean,
-    onSidebarToggle: (Boolean) -> Unit
+    onSidebarToggle: (Boolean) -> Unit,
+    canDelete: Boolean
 ) {
     val device = LocalDeviceProfile.current
     Column(modifier = Modifier.fillMaxSize()) {
@@ -415,6 +460,14 @@ private fun SlideshowPanel(
                     label = if (device.isTv) "Pantalla completa" else "Pantalla",
                     onClick = onOpenFullscreen
                 )
+                if (canDelete) {
+                    DeviceActionButton(
+                        icon = Icons.Default.DeleteOutline,
+                        label = "Borrar",
+                        onClick = onDeleteCurrent,
+                        destructive = true
+                    )
+                }
             }
         }
 
@@ -691,47 +744,50 @@ private fun DeviceActionButton(
     icon: ImageVector,
     label: String,
     onClick: () -> Unit,
-    compact: Boolean = false
+    compact: Boolean = false,
+    destructive: Boolean = false
 ) {
     val device = LocalDeviceProfile.current
     val useTvButton = device.isTv && !compact
     val size = if (compact) 40.dp else device.actionButtonSize
+    val borderColor = if (destructive) NostalgiaAccent.copy(alpha = 0.5f) else PaperLine
+    val iconTint = if (destructive) NostalgiaAccent else PaperInk
 
     if (useTvButton) {
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(PaperSurface)
-                .border(1.dp, PaperLine, RoundedCornerShape(50))
+                .background(if (destructive) NostalgiaSelected else PaperSurface)
+                .border(1.dp, borderColor, RoundedCornerShape(50))
                 .safeClickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Icon(icon, contentDescription = label, tint = PaperInk, modifier = Modifier.size(22.dp))
-            Text(label, color = PaperInk, fontSize = 14.sp, fontWeight = FontWeight.Medium)
+            Icon(icon, contentDescription = label, tint = iconTint, modifier = Modifier.size(22.dp))
+            Text(label, color = iconTint, fontSize = 14.sp, fontWeight = FontWeight.Medium)
         }
     } else if (device.isTv) {
         Box(
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(PaperSurface)
-                .border(1.dp, PaperLine, CircleShape)
+                .background(if (destructive) NostalgiaSelected else PaperSurface)
+                .border(1.dp, borderColor, CircleShape)
                 .safeClickable(onClick = onClick, showFocusBorder = false),
             contentAlignment = Alignment.Center
         ) {
-            Icon(icon, contentDescription = label, tint = PaperInk, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = label, tint = iconTint, modifier = Modifier.size(22.dp))
         }
     } else {
         IconButton(
             onClick = onClick,
             modifier = Modifier
                 .size(size)
-                .background(PaperSurface, CircleShape)
-                .border(1.dp, PaperLine, CircleShape)
+                .background(if (destructive) NostalgiaSelected else PaperSurface, CircleShape)
+                .border(1.dp, borderColor, CircleShape)
         ) {
-            Icon(icon, contentDescription = label, tint = PaperInk)
+            Icon(icon, contentDescription = label, tint = iconTint)
         }
     }
 }
