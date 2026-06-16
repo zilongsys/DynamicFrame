@@ -33,7 +33,7 @@ class FilePathFolderScanner @Inject constructor() {
                 if (!filter.allows(type)) return@forEach
                 items.add(
                     MediaItem(
-                        id = "path_${file.absolutePath.hashCode()}",
+                        id = "path_${file.absolutePath}",
                         uri = Uri.fromFile(file),
                         type = type,
                         source = MediaSource.LOCAL,
@@ -62,7 +62,7 @@ class FilePathFolderScanner @Inject constructor() {
                 val title = file.nameWithoutExtension
                 tracks.add(
                     MusicTrack(
-                        id = "path_music_${file.absolutePath.hashCode()}",
+                        id = "path_music_${file.absolutePath}",
                         uri = Uri.fromFile(file),
                         title = title,
                         artist = "Carpeta local",

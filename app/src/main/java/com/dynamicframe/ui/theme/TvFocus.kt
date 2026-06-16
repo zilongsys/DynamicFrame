@@ -5,14 +5,17 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -24,21 +27,25 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.delay
 
-private val TvFocusColor = Color(0xFFC75B7A)
+// MemoriaPurple definido en MemoriaTheme.kt (mismo paquete)
+
+private val TvFocusColor = MemoriaPurple
 
 /** Foco + D-pad/OK para Android TV y TV box. */
 @Composable
 fun Modifier.tvClickable(
     enabled: Boolean = true,
     showFocusBorder: Boolean = true,
+    focusShape: Shape = RoundedCornerShape(12.dp),
+    interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit
 ): Modifier {
-    val interactionSource = remember { MutableInteractionSource() }
-    val focused by interactionSource.collectIsFocusedAsState()
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
 
     return this
         .semantics { role = Role.Button }
-        .focusable(enabled = enabled, interactionSource = interactionSource)
+        .focusable(enabled = enabled, interactionSource = source)
         .onKeyEvent { event ->
             if (!enabled) return@onKeyEvent false
             val isSelectKey = event.key == Key.DirectionCenter ||
@@ -55,15 +62,15 @@ fun Modifier.tvClickable(
         }
         .clickable(
             enabled = enabled,
-            interactionSource = interactionSource,
+            interactionSource = source,
             indication = null,
             onClick = onClick
         )
         .then(
-            if (showFocusBorder && focused) {
-                Modifier.border(3.dp, TvFocusColor, RoundedCornerShape(12.dp))
-            } else {
-                Modifier
+            when {
+                !showFocusBorder && focused -> Modifier.scale(1.06f)
+                showFocusBorder && focused -> Modifier.border(2.dp, TvFocusColor, focusShape)
+                else -> Modifier
             }
         )
 }

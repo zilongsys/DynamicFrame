@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Dynamic Frame</string>
+    <string name="app_name">MEMORIA</string>
     <string name="app_description">Marco digital dinámico para TV</string>
     <string name="settings">Configuración</string>
     <string name="slideshow">Slideshow</string>

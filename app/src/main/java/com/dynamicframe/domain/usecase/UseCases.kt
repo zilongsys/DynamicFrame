@@ -15,14 +15,31 @@ class GetSlideshowItemsUseCase @Inject constructor(
         val config = settingsRepository.getConfig()
 
         val rawItems = when {
-            config.mediaFolderUris.isNotEmpty() -> {
-                val folders = if (config.selectedAlbumIds.isEmpty()) {
-                    config.mediaFolderUris
-                } else {
-                    config.selectedAlbumIds.filter { it.startsWith("content://") }
-                        .ifEmpty { config.mediaFolderUris }
+            config.hasCustomMediaFolders() -> {
+                val items = mutableListOf<MediaItem>()
+                val photoFolders = foldersForAlbumSelection(
+                    config.photoFolderUris,
+                    config.selectedAlbumIds,
+                    MediaFolderKind.PHOTO
+                )
+                val videoFolders = foldersForAlbumSelection(
+                    config.videoFolderUris,
+                    config.selectedAlbumIds,
+                    MediaFolderKind.VIDEO
+                )
+
+                if (photoFolders.isNotEmpty()) {
+                    mediaRepository.getMediaFromFolders(photoFolders, MediaContentFilter.PHOTOS_ONLY)
+                        .getOrNull()
+                        ?.let { items.addAll(it) }
                 }
-                mediaRepository.getMediaFromFolders(folders, config.mediaContentFilter)
+                if (videoFolders.isNotEmpty()) {
+                    mediaRepository.getMediaFromFolders(videoFolders, MediaContentFilter.VIDEOS_ONLY)
+                        .getOrNull()
+                        ?.let { items.addAll(it) }
+                }
+
+                Result.success(items.distinctBy { it.id })
             }
             config.selectedAlbumIds.isNotEmpty() -> {
                 val items = mutableListOf<MediaItem>()
@@ -41,6 +58,7 @@ class GetSlideshowItemsUseCase @Inject constructor(
                 .sortedByDescending { it.dateAdded }
         }
     }
+
 }
 
 class ObserveSlideshowConfigUseCase @Inject constructor(
@@ -57,9 +75,8 @@ class GetMusicTracksUseCase @Inject constructor(
         val config = settingsRepository.getConfig()
         return when (config.musicSourceType) {
             MusicSourceType.LOCAL_FOLDER -> {
-                val uri = config.musicFolderUri
-                if (uri.isNullOrBlank()) Result.success(emptyList())
-                else musicRepository.getTracksFromFolder(uri)
+                if (config.musicFolderUris.isEmpty()) Result.success(emptyList())
+                else musicRepository.getTracksFromFolders(config.musicFolderUris)
             }
             MusicSourceType.DEVICE_LIBRARY, MusicSourceType.THEME ->
                 musicRepository.getLocalTracks()

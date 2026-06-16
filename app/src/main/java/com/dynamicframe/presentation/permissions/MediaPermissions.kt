@@ -7,6 +7,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import java.util.concurrent.ConcurrentLinkedQueue
 
 enum class MediaPermissionKind { PHOTOS_VIDEOS, MUSIC, ALL }
 
@@ -19,12 +20,23 @@ class MediaPermissionState internal constructor(
             onGranted()
             return
         }
-        pendingAction = onGranted
+        pendingActions.add(onGranted)
         request(perms)
     }
 
     companion object {
-        internal var pendingAction: (() -> Unit)? = null
+        private val pendingActions = ConcurrentLinkedQueue<() -> Unit>()
+
+        internal fun flushGranted() {
+            while (true) {
+                val action = pendingActions.poll() ?: break
+                action()
+            }
+        }
+
+        internal fun clearPending() {
+            pendingActions.clear()
+        }
     }
 }
 
@@ -36,9 +48,10 @@ fun rememberMediaPermissions(): MediaPermissionState {
     ) { results ->
         val allGranted = results.values.all { it }
         if (allGranted) {
-            MediaPermissionState.pendingAction?.invoke()
+            MediaPermissionState.flushGranted()
+        } else {
+            MediaPermissionState.clearPending()
         }
-        MediaPermissionState.pendingAction = null
     }
 
     return remember {
@@ -48,8 +61,7 @@ fun rememberMediaPermissions(): MediaPermissionState {
                     android.content.pm.PackageManager.PERMISSION_GRANTED
             }
             if (missing.isEmpty()) {
-                MediaPermissionState.pendingAction?.invoke()
-                MediaPermissionState.pendingAction = null
+                MediaPermissionState.flushGranted()
             } else {
                 launcher.launch(missing.toTypedArray())
             }

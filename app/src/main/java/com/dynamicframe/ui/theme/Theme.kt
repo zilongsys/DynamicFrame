@@ -1,23 +1,26 @@
 package com.dynamicframe.ui.theme
 
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.LocalRippleConfiguration
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.ui.graphics.Color
 import com.dynamicframe.presentation.device.typographyForDevice
 
-// Paleta nostálgica — rosa suave, crema y ciruela
-val NostalgiaBackground = Color(0xFFFFF5F7)
-val NostalgiaSurface = Color(0xFFFFFBFC)
-val NostalgiaCard = Color(0xFFFFE8EF)
-val NostalgiaInk = Color(0xFF4A2C3D)
-val NostalgiaMuted = Color(0xFF9A7082)
-val NostalgiaLine = Color(0xFFF5C6D6)
-val NostalgiaAccent = Color(0xFFD4738F)
-val NostalgiaAccentDeep = Color(0xFFB85C78)
-val NostalgiaSelected = Color(0xFFFFD9E6)
-val NostalgiaFocus = Color(0xFFC75B7A)
-val NostalgiaGlow = Color(0xFFFFB8D0)
+// Paleta MEMORIA — crema + morado (alias Nostalgia* para compatibilidad)
+val NostalgiaBackground = MemoriaBg
+val NostalgiaSurface = MemoriaSurface
+val NostalgiaCard = MemoriaPurpleSoft
+val NostalgiaInk = MemoriaInk
+val NostalgiaMuted = MemoriaMuted
+val NostalgiaLine = MemoriaLine
+val NostalgiaAccent = MemoriaPurple
+val NostalgiaAccentDeep = MemoriaPurpleDark
+val NostalgiaSelected = MemoriaPurpleSoft
+val NostalgiaFocus = MemoriaPurple
+val NostalgiaGlow = MemoriaPurpleSoft
 
 // Alias para compatibilidad con pantallas existentes
 val PaperBackground = NostalgiaBackground
@@ -44,6 +47,7 @@ private val NostalgiaColorScheme = lightColorScheme(
     onError = Color.White
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DynamicFrameTheme(
     isTv: Boolean = false,
@@ -51,7 +55,11 @@ fun DynamicFrameTheme(
 ) {
     MaterialTheme(
         colorScheme = NostalgiaColorScheme,
-        typography = typographyForDevice(isTv),
-        content = content
-    )
+        typography = typographyForDevice(isTv)
+    ) {
+        // Evita crash PlatformRipple en TV box al componer Slider/ProgressIndicator.
+        CompositionLocalProvider(LocalRippleConfiguration provides null) {
+            content()
+        }
+    }
 }

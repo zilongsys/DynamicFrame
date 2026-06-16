@@ -1,6 +1,15 @@
 package com.dynamicframe.presentation
 
+import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.LocalContext
+import androidx.hilt.navigation.compose.hiltViewModel
+import kotlinx.coroutines.delay
+import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -9,7 +18,9 @@ import com.dynamicframe.presentation.home.HomeScreen
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
 import com.dynamicframe.presentation.permissions.rememberMediaPermissions
 import com.dynamicframe.presentation.settings.SettingsScreen
+import com.dynamicframe.presentation.settings.SettingsViewModel
 import com.dynamicframe.presentation.slideshow.SlideshowScreen
+import com.dynamicframe.presentation.slideshow.SlideshowViewModel
 
 sealed class Screen(val route: String) {
     object Home : Screen("home")
@@ -22,6 +33,27 @@ fun DynamicFrameNavHost(
     isTV: Boolean,
     navController: NavHostController = rememberNavController()
 ) {
+    val activity = LocalContext.current as ComponentActivity
+    val slideshowViewModel: SlideshowViewModel = hiltViewModel(activity)
+    val settingsViewModel: SettingsViewModel = hiltViewModel(activity)
+
+    var fullscreenNavLocked by remember { mutableStateOf(false) }
+    LaunchedEffect(fullscreenNavLocked) {
+        if (fullscreenNavLocked) {
+            delay(450)
+            fullscreenNavLocked = false
+        }
+    }
+
+    fun openFullscreen() {
+        if (fullscreenNavLocked) return
+        if (navController.currentDestination?.route == Screen.Slideshow.route) return
+        fullscreenNavLocked = true
+        navController.navigate(Screen.Slideshow.route) {
+            launchSingleTop = true
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route
@@ -29,12 +61,15 @@ fun DynamicFrameNavHost(
         composable(Screen.Home.route) {
             HomeScreen(
                 isTV = isTV,
-                onOpenFullscreen = { navController.navigate(Screen.Slideshow.route) }
+                slideshowViewModel = slideshowViewModel,
+                settingsViewModel = settingsViewModel,
+                onOpenFullscreen = { openFullscreen() }
             )
         }
 
         composable(Screen.Slideshow.route) {
             SlideshowScreen(
+                viewModel = slideshowViewModel,
                 isTV = isTV,
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onBack = { navController.popBackStack() }
@@ -44,6 +79,7 @@ fun DynamicFrameNavHost(
         composable(Screen.Settings.route) {
             val permissions = rememberMediaPermissions()
             SettingsScreen(
+                viewModel = settingsViewModel,
                 onBack = { navController.popBackStack() },
                 requestMediaAccess = { onGranted ->
                     permissions.requestFor(MediaPermissionKind.PHOTOS_VIDEOS, onGranted)

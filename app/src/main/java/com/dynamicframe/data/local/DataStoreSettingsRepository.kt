@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
 import androidx.datastore.preferences.preferencesDataStore
 import com.dynamicframe.domain.model.*
+import com.dynamicframe.domain.model.allMediaFolderUris
 import com.dynamicframe.domain.repository.SettingsRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -20,6 +21,9 @@ private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(na
 class DataStoreSettingsRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) : SettingsRepository {
+
+    @Volatile
+    private var cachedConfig: SlideshowConfig = SlideshowConfig()
 
     private object Keys {
         val INTERVAL = intPreferencesKey("interval_seconds")
@@ -39,9 +43,12 @@ class DataStoreSettingsRepository @Inject constructor(
         val AUTO_START = booleanPreferencesKey("auto_start_boot")
         val SCREENSAVER = booleanPreferencesKey("screensaver_mode")
         val MEDIA_FOLDERS = stringPreferencesKey("media_folder_uris")
+        val PHOTO_FOLDERS = stringPreferencesKey("photo_folder_uris")
+        val VIDEO_FOLDERS = stringPreferencesKey("video_folder_uris")
         val MEDIA_CONTENT_FILTER = stringPreferencesKey("media_content_filter")
         val MUSIC_SOURCE = stringPreferencesKey("music_source_type")
         val MUSIC_FOLDER = stringPreferencesKey("music_folder_uri")
+        val MUSIC_FOLDERS = stringPreferencesKey("music_folder_uris")
         val MUSIC_THEME = stringPreferencesKey("music_theme")
         val SPOTIFY_URL = stringPreferencesKey("spotify_playlist_url")
         val YOUTUBE_URL = stringPreferencesKey("youtube_playlist_url")
@@ -54,15 +61,24 @@ class DataStoreSettingsRepository @Inject constructor(
         val TRANSITION_DURATION_MS = intPreferencesKey("transition_duration_ms")
         val SHOW_SCREEN_BORDER = booleanPreferencesKey("show_screen_border")
         val UI_SCALE = floatPreferencesKey("ui_scale")
+        val SHOW_PICTURE_FRAME = booleanPreferencesKey("show_picture_frame")
+        val PLAYBACK_SAFE_BORDER = booleanPreferencesKey("playback_safe_border")
+        val PLAYBACK_FRAME_SCALE = floatPreferencesKey("playback_frame_scale")
+        val PLAYBACK_CONTENT_ZOOM = floatPreferencesKey("playback_content_zoom")
+        val PLAYBACK_BACKGROUND = stringPreferencesKey("playback_background_type")
+        val PLAYBACK_BACKGROUND_IMAGE = stringPreferencesKey("playback_background_image_uri")
     }
 
     override fun observeConfig(): Flow<SlideshowConfig> =
         context.dataStore.data
-            .catch { emit(emptyPreferences()) }
-            .map { prefs -> prefs.toConfig() }
+            .map { prefs -> prefs.toConfig().also { cachedConfig = it } }
+            .catch {
+                emit(cachedConfig)
+            }
 
-    override suspend fun getConfig(): SlideshowConfig =
-        context.dataStore.data.catch { emit(emptyPreferences()) }.first().toConfig()
+    override suspend fun getConfig(): SlideshowConfig = runCatching {
+        context.dataStore.data.first().toConfig().also { cachedConfig = it }
+    }.getOrElse { cachedConfig }
 
     override suspend fun saveConfig(config: SlideshowConfig) {
         context.dataStore.edit { prefs ->
@@ -82,10 +98,13 @@ class DataStoreSettingsRepository @Inject constructor(
             prefs[Keys.MUSIC_PLAYLIST] = config.musicPlaylistId ?: ""
             prefs[Keys.AUTO_START] = config.autoStartOnBoot
             prefs[Keys.SCREENSAVER] = config.screenSaverMode
-            prefs[Keys.MEDIA_FOLDERS] = config.mediaFolderUris.joinToString("|")
+            prefs[Keys.PHOTO_FOLDERS] = config.photoFolderUris.joinToString("|")
+            prefs[Keys.VIDEO_FOLDERS] = config.videoFolderUris.joinToString("|")
+            prefs[Keys.MEDIA_FOLDERS] = config.allMediaFolderUris().joinToString("|")
             prefs[Keys.MEDIA_CONTENT_FILTER] = config.mediaContentFilter.name
             prefs[Keys.MUSIC_SOURCE] = config.musicSourceType.name
-            prefs[Keys.MUSIC_FOLDER] = config.musicFolderUri ?: ""
+            prefs[Keys.MUSIC_FOLDERS] = config.musicFolderUris.joinToString("|")
+            prefs[Keys.MUSIC_FOLDER] = config.musicFolderUris.firstOrNull() ?: ""
             prefs[Keys.MUSIC_THEME] = config.musicTheme.name
             prefs[Keys.SPOTIFY_URL] = config.spotifyPlaylistUrl
             prefs[Keys.YOUTUBE_URL] = config.youtubePlaylistUrl
@@ -98,8 +117,15 @@ class DataStoreSettingsRepository @Inject constructor(
             prefs[Keys.TRANSITION_DURATION_MS] = config.transitionDurationMs
             prefs[Keys.SHOW_SCREEN_BORDER] = config.showScreenBorder
             prefs[Keys.UI_SCALE] = config.uiScale
+            prefs[Keys.SHOW_PICTURE_FRAME] = config.showPictureFrame
+            prefs[Keys.PLAYBACK_SAFE_BORDER] = config.playbackShowSafeBorder
+            prefs[Keys.PLAYBACK_FRAME_SCALE] = config.playbackPictureFrameScale
+            prefs[Keys.PLAYBACK_CONTENT_ZOOM] = config.playbackContentZoom
+            prefs[Keys.PLAYBACK_BACKGROUND] = config.playbackBackgroundType.name
+            prefs[Keys.PLAYBACK_BACKGROUND_IMAGE] = config.playbackBackgroundImageUri
         }
         syncBootPreference(config.autoStartOnBoot)
+        cachedConfig = config
     }
 
     override suspend fun updateInterval(seconds: Int) {
@@ -150,10 +176,11 @@ class DataStoreSettingsRepository @Inject constructor(
         musicPlaylistId = this[Keys.MUSIC_PLAYLIST]?.ifBlank { null },
         autoStartOnBoot = this[Keys.AUTO_START] ?: false,
         screenSaverMode = this[Keys.SCREENSAVER] ?: false,
-        mediaFolderUris = splitList(this[Keys.MEDIA_FOLDERS]),
+        photoFolderUris = resolvePhotoFolders(this),
+        videoFolderUris = resolveVideoFolders(this),
         mediaContentFilter = enumOrDefault(this[Keys.MEDIA_CONTENT_FILTER], MediaContentFilter.ALL),
         musicSourceType = enumOrDefault(this[Keys.MUSIC_SOURCE], MusicSourceType.DEVICE_LIBRARY),
-        musicFolderUri = this[Keys.MUSIC_FOLDER]?.ifBlank { null },
+        musicFolderUris = resolveMusicFolders(this),
         musicTheme = enumOrDefault(this[Keys.MUSIC_THEME], MusicTheme.RELAX),
         spotifyPlaylistUrl = this[Keys.SPOTIFY_URL] ?: "",
         youtubePlaylistUrl = this[Keys.YOUTUBE_URL] ?: "",
@@ -165,11 +192,45 @@ class DataStoreSettingsRepository @Inject constructor(
         playbackImmersiveMode = this[Keys.PLAYBACK_IMMERSIVE] ?: false,
         transitionDurationMs = this[Keys.TRANSITION_DURATION_MS] ?: 1400,
         showScreenBorder = this[Keys.SHOW_SCREEN_BORDER] ?: false,
-        uiScale = this[Keys.UI_SCALE] ?: 1.0f
+        uiScale = this[Keys.UI_SCALE] ?: 1.0f,
+        showPictureFrame = this[Keys.SHOW_PICTURE_FRAME] ?: false,
+        playbackShowSafeBorder = this[Keys.PLAYBACK_SAFE_BORDER] ?: false,
+        playbackPictureFrameScale = this[Keys.PLAYBACK_FRAME_SCALE] ?: 1.0f,
+        playbackContentZoom = this[Keys.PLAYBACK_CONTENT_ZOOM] ?: 1.0f,
+        playbackBackgroundType = enumOrDefault(this[Keys.PLAYBACK_BACKGROUND], PlaybackBackgroundType.DEMO_LAVENDER),
+        playbackBackgroundImageUri = this[Keys.PLAYBACK_BACKGROUND_IMAGE] ?: ""
     )
 
     private fun splitList(raw: String?): List<String> =
         raw?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
+
+    private fun resolvePhotoFolders(prefs: Preferences): List<String> {
+        val explicit = splitList(prefs[Keys.PHOTO_FOLDERS])
+        if (explicit.isNotEmpty()) return explicit
+        return migrateLegacyMediaFolders(prefs).first
+    }
+
+    private fun resolveVideoFolders(prefs: Preferences): List<String> {
+        val explicit = splitList(prefs[Keys.VIDEO_FOLDERS])
+        if (explicit.isNotEmpty()) return explicit
+        return migrateLegacyMediaFolders(prefs).second
+    }
+
+    private fun migrateLegacyMediaFolders(prefs: Preferences): Pair<List<String>, List<String>> {
+        val legacy = splitList(prefs[Keys.MEDIA_FOLDERS])
+        if (legacy.isEmpty()) return emptyList<String>() to emptyList()
+        return when (enumOrDefault(prefs[Keys.MEDIA_CONTENT_FILTER], MediaContentFilter.ALL)) {
+            MediaContentFilter.PHOTOS_ONLY -> legacy to emptyList()
+            MediaContentFilter.VIDEOS_ONLY -> emptyList<String>() to legacy
+            MediaContentFilter.ALL -> legacy to legacy
+        }
+    }
+
+    private fun resolveMusicFolders(prefs: Preferences): List<String> {
+        val explicit = splitList(prefs[Keys.MUSIC_FOLDERS])
+        if (explicit.isNotEmpty()) return explicit
+        return listOfNotNull(prefs[Keys.MUSIC_FOLDER]?.ifBlank { null })
+    }
 
     private inline fun <reified T : Enum<T>> enumOrDefault(name: String?, default: T): T =
         runCatching { enumValueOf<T>(name ?: return default) }.getOrDefault(default)

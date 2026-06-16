@@ -5,6 +5,7 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.safeClickable
@@ -28,9 +29,21 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dynamicframe.data.local.LocalStorageBrowser
 import com.dynamicframe.domain.model.*
+import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.presentation.browser.FolderBrowserDialog
 import com.dynamicframe.presentation.browser.StoragePicker
 import com.dynamicframe.ui.theme.NostalgiaActionButton
+import com.dynamicframe.ui.theme.TvStepperChip
+import com.dynamicframe.ui.theme.PlaybackLetterboxBackground
+import com.dynamicframe.ui.theme.displayName as playbackBackgroundDisplayName
+import com.dynamicframe.ui.theme.AppVersionLabel
+import androidx.compose.foundation.border
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
+import com.dynamicframe.ui.theme.MemoriaLine
+import com.dynamicframe.ui.theme.MemoriaPurple
+
+private enum class FolderTarget { PHOTO, VIDEO, MUSIC }
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -47,12 +60,14 @@ fun SettingsScreen(
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     val device = LocalDeviceProfile.current
     val context = LocalContext.current
-    var showMediaFolderBrowser by remember { mutableStateOf(false) }
-    var showMusicFolderBrowser by remember { mutableStateOf(false) }
+
+    var folderBrowserTarget by remember { mutableStateOf<FolderTarget?>(null) }
     val useInAppBrowser = StoragePicker.shouldUseInAppBrowser(device.isTv, context)
     val systemPickerAvailable = StoragePicker.isSystemFolderPickerAvailable(context)
 
-    val mediaFolderLauncher = rememberLauncherForActivityResult(
+    var pendingFolderTarget by remember { mutableStateOf<FolderTarget?>(null) }
+
+    val folderLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenDocumentTree()
     ) { uri ->
         uri?.let {
@@ -60,55 +75,77 @@ fun SettingsScreen(
                 it,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-            viewModel.addMediaFolder(it.toString())
-            onMediaChanged()
+            when (pendingFolderTarget) {
+                FolderTarget.PHOTO -> {
+                    viewModel.addPhotoFolder(it.toString())
+                    onMediaChanged()
+                }
+                FolderTarget.VIDEO -> {
+                    viewModel.addVideoFolder(it.toString())
+                    onMediaChanged()
+                }
+                FolderTarget.MUSIC -> viewModel.addMusicFolder(it.toString())
+                null -> Unit
+            }
+            pendingFolderTarget = null
         }
     }
 
-    val musicFolderLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.OpenDocumentTree()
+    val backgroundImageLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.OpenDocument()
     ) { uri ->
         uri?.let {
             context.contentResolver.takePersistableUriPermission(
                 it,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-            viewModel.setMusicFolder(it.toString())
+            viewModel.updateConfig(
+                config.copy(
+                    playbackBackgroundType = PlaybackBackgroundType.CUSTOM_IMAGE,
+                    playbackBackgroundImageUri = it.toString()
+                )
+            )
         }
     }
 
-    fun openMediaFolderPicker() {
+    fun openFolderPicker(target: FolderTarget, requestAccess: ((() -> Unit) -> Unit)? = null) {
         val action = {
-            if (useInAppBrowser) showMediaFolderBrowser = true
-            else mediaFolderLauncher.launch(null)
+            pendingFolderTarget = target
+            if (useInAppBrowser) folderBrowserTarget = target
+            else folderLauncher.launch(null)
         }
-        if (requestMediaAccess != null) requestMediaAccess(action) else action()
-    }
-
-    fun openMusicFolderPicker() {
-        val action = {
-            if (useInAppBrowser) showMusicFolderBrowser = true
-            else musicFolderLauncher.launch(null)
-        }
-        if (requestMusicAccess != null) requestMusicAccess(action) else action()
+        if (requestAccess != null) requestAccess(action) else action()
     }
 
     FolderBrowserDialog(
-        visible = showMediaFolderBrowser,
-        title = "Carpeta de fotos y vídeos",
-        onDismiss = { showMediaFolderBrowser = false },
+        visible = folderBrowserTarget == FolderTarget.PHOTO,
+        title = "Carpeta de fotos",
+        onDismiss = { folderBrowserTarget = null },
         onSelectFolder = { uri ->
-            viewModel.addMediaFolder(uri)
+            viewModel.addPhotoFolder(uri)
             onMediaChanged()
+            folderBrowserTarget = null
         }
     )
 
     FolderBrowserDialog(
-        visible = showMusicFolderBrowser,
-        title = "Carpeta de música",
-        onDismiss = { showMusicFolderBrowser = false },
+        visible = folderBrowserTarget == FolderTarget.VIDEO,
+        title = "Carpeta de videos",
+        onDismiss = { folderBrowserTarget = null },
         onSelectFolder = { uri ->
-            viewModel.setMusicFolder(uri)
+            viewModel.addVideoFolder(uri)
+            onMediaChanged()
+            folderBrowserTarget = null
+        }
+    )
+
+    FolderBrowserDialog(
+        visible = folderBrowserTarget == FolderTarget.MUSIC,
+        title = "Carpeta de música",
+        onDismiss = { folderBrowserTarget = null },
+        onSelectFolder = { uri ->
+            viewModel.addMusicFolder(uri)
+            folderBrowserTarget = null
         }
     )
 
@@ -119,8 +156,17 @@ fun SettingsScreen(
                 TopAppBar(
                     title = { Text("Configuración") },
                     navigationIcon = {
-                        IconButton(onClick = onBack) {
+                        Row(
+                            modifier = Modifier
+                                .safeClickable(onClick = onBack)
+                                .padding(horizontal = 12.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
                             Icon(Icons.Default.ArrowBack, contentDescription = "Volver")
+                            if (device.isTv) {
+                                Text("Volver", fontSize = 14.sp)
+                            }
                         }
                     },
                     colors = TopAppBarDefaults.topAppBarColors(
@@ -134,7 +180,8 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(horizontal = 16.dp),
+                .padding(horizontal = 16.dp)
+                .then(if (device.isTv) Modifier.focusGroup() else Modifier),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(vertical = if (embedded) 0.dp else 16.dp)
         ) {
@@ -233,10 +280,107 @@ fun SettingsScreen(
                 Spacer(Modifier.height(4.dp))
                 SettingsSectionHeader("Modo reproducción", Icons.Default.Fullscreen)
                 Text(
-                    text = "Solo aplica en pantalla completa. En modo solo imagen, toca la pantalla para ver controles.",
+                    text = "Pantalla completa: toca/OK para pausar. Las ayudas se ocultan a los 5 s; el texto de acciones, a 1 s.",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     fontSize = 12.sp,
                     modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            item {
+                SettingsSwitchItem(
+                    title = "Marco dorado (estilo cuadro)",
+                    icon = Icons.Default.FilterFrames,
+                    checked = config.showPictureFrame,
+                    onCheckedChange = { viewModel.updateConfig(config.copy(showPictureFrame = it)) }
+                )
+            }
+
+            item {
+                SettingsSliderItem(
+                    title = "Grosor del marco dorado",
+                    value = config.playbackPictureFrameScale,
+                    valueRange = 0.5f..1.5f,
+                    valueLabel = "${(config.playbackPictureFrameScale * 100).toInt()}%",
+                    onValueChange = {
+                        viewModel.updateConfig(config.copy(playbackPictureFrameScale = it))
+                    },
+                    steps = 9
+                )
+            }
+
+            item {
+                SettingsSliderItem(
+                    title = "Zoom en pantalla completa",
+                    value = config.playbackContentZoom,
+                    valueRange = 0.75f..1f,
+                    valueLabel = "${(config.playbackContentZoom * 100).toInt()}%",
+                    onValueChange = {
+                        viewModel.updateConfig(config.copy(playbackContentZoom = it))
+                    },
+                    steps = 4
+                )
+            }
+
+            item {
+                Spacer(Modifier.height(4.dp))
+                SettingsSectionHeader("Fondo letterbox", Icons.Default.Wallpaper)
+                Text(
+                    text = "Rellena el espacio alrededor de fotos que no ocupan todo el marco.",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(bottom = 8.dp)
+                )
+            }
+
+            item {
+                SettingsDropdownItem(
+                    title = "Tipo de fondo",
+                    icon = Icons.Default.Palette,
+                    currentValue = config.playbackBackgroundType.playbackBackgroundDisplayName(),
+                    options = PlaybackBackgroundType.entries.map { it.playbackBackgroundDisplayName() },
+                    onSelect = { idx ->
+                        viewModel.updateConfig(
+                            config.copy(playbackBackgroundType = PlaybackBackgroundType.entries[idx])
+                        )
+                    }
+                )
+            }
+
+            item {
+                PlaybackBackgroundPreviewRow(
+                    selected = config.playbackBackgroundType,
+                    onSelect = { viewModel.updateConfig(config.copy(playbackBackgroundType = it)) }
+                )
+            }
+
+            if (config.playbackBackgroundType == PlaybackBackgroundType.CUSTOM_IMAGE) {
+                item {
+                    NostalgiaActionButton(
+                        text = "Elegir mi imagen",
+                        icon = Icons.Default.Image,
+                        onClick = { backgroundImageLauncher.launch(arrayOf("image/*")) }
+                    )
+                }
+                if (config.playbackBackgroundImageUri.isNotBlank()) {
+                    item {
+                        Text(
+                            text = "Imagen seleccionada",
+                            fontSize = 12.sp,
+                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f)
+                        )
+                    }
+                }
+            }
+
+            item {
+                SettingsSwitchItem(
+                    title = "Borde rosa (zona segura)",
+                    icon = Icons.Default.CropFree,
+                    checked = config.playbackShowSafeBorder,
+                    onCheckedChange = {
+                        viewModel.updateConfig(config.copy(playbackShowSafeBorder = it))
+                    }
                 )
             }
 
@@ -285,15 +429,15 @@ fun SettingsScreen(
                 )
             }
 
-            // ── CARPETAS DE FOTOS/VIDEOS ─────────────────────────────────────
+            // ── CARPETAS DE FOTOS Y VIDEOS ───────────────────────────────────
             item {
                 Spacer(Modifier.height(8.dp))
-                SettingsSectionHeader("Carpetas de fotos y videos", Icons.Default.Folder)
+                SettingsSectionHeader("Carpetas de medios", Icons.Default.Folder)
                 Text(
                     text = if (useInAppBrowser) {
-                        "Explorador integrado (no requiere otra app). Sin carpeta = galería del dispositivo."
+                        "Puedes añadir varias carpetas para fotos y videos por separado. Sin carpeta = galería."
                     } else {
-                        "Incluye subcarpetas. Sin carpeta = galería del dispositivo."
+                        "Añade tantas carpetas como necesites. Sin carpeta = galería del dispositivo."
                     },
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     fontSize = 12.sp,
@@ -302,28 +446,63 @@ fun SettingsScreen(
             }
 
             item {
+                Text(
+                    "Fotos",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
                 NostalgiaActionButton(
-                    text = if (useInAppBrowser) "Explorar carpetas (integrado)"
-                    else if (device.isTv) "Elegir carpeta de medios"
-                    else "Carpeta de medios",
-                    icon = Icons.Default.CreateNewFolder,
-                    onClick = { openMediaFolderPicker() }
+                    text = if (useInAppBrowser) "Añadir carpeta de fotos"
+                    else "Elegir carpeta de fotos",
+                    icon = Icons.Default.Photo,
+                    onClick = { openFolderPicker(FolderTarget.PHOTO, requestMediaAccess) }
+                )
+            }
+
+            items(config.photoFolderUris, key = { it }) { uri ->
+                FolderChip(
+                    label = folderLabel(uri),
+                    onRemove = {
+                        viewModel.removePhotoFolder(uri)
+                        onMediaChanged()
+                    }
+                )
+            }
+
+            item {
+                Spacer(Modifier.height(8.dp))
+                Text(
+                    "Videos",
+                    fontWeight = FontWeight.SemiBold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 4.dp)
+                )
+                NostalgiaActionButton(
+                    text = if (useInAppBrowser) "Añadir carpeta de videos"
+                    else "Elegir carpeta de videos",
+                    icon = Icons.Default.Movie,
+                    onClick = { openFolderPicker(FolderTarget.VIDEO, requestMediaAccess) }
+                )
+            }
+
+            items(config.videoFolderUris, key = { it }) { uri ->
+                FolderChip(
+                    label = folderLabel(uri),
+                    onRemove = {
+                        viewModel.removeVideoFolder(uri)
+                        onMediaChanged()
+                    }
                 )
             }
 
             if (!useInAppBrowser && systemPickerAvailable) {
                 item {
-                    OutlinedButton(
-                        onClick = {
-                            val launch = { mediaFolderLauncher.launch(null) }
-                            if (requestMediaAccess != null) requestMediaAccess(launch) else launch()
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(Icons.Default.FolderOpen, contentDescription = null)
-                        Spacer(Modifier.width(8.dp))
-                        Text("Selector del sistema")
-                    }
+                    NostalgiaActionButton(
+                        text = "Selector del sistema (fotos)",
+                        icon = Icons.Default.FolderOpen,
+                        onClick = { openFolderPicker(FolderTarget.PHOTO, requestMediaAccess) }
+                    )
                 }
             }
 
@@ -334,16 +513,6 @@ fun SettingsScreen(
                     onClick = {
                         val grant = { onMediaChanged() }
                         if (requestMediaAccess != null) requestMediaAccess(grant) else grant()
-                    }
-                )
-            }
-
-            items(config.mediaFolderUris) { uri ->
-                FolderChip(
-                    label = folderLabel(uri),
-                    onRemove = {
-                        viewModel.removeMediaFolder(uri)
-                        onMediaChanged()
                     }
                 )
             }
@@ -428,13 +597,16 @@ fun SettingsScreen(
             if (config.musicSourceType == MusicSourceType.LOCAL_FOLDER) {
                 item {
                     NostalgiaActionButton(
-                        text = if (config.musicFolderUri != null) {
-                            "Música: ${folderLabel(config.musicFolderUri!!)}"
-                        } else {
-                            "Elegir carpeta de música"
-                        },
+                        text = if (useInAppBrowser) "Añadir carpeta de música"
+                        else "Elegir carpeta de música",
                         icon = Icons.Default.FolderOpen,
-                        onClick = { openMusicFolderPicker() }
+                        onClick = { openFolderPicker(FolderTarget.MUSIC, requestMusicAccess) }
+                    )
+                }
+                items(config.musicFolderUris, key = { it }) { uri ->
+                    FolderChip(
+                        label = folderLabel(uri),
+                        onRemove = { viewModel.removeMusicFolder(uri) }
                     )
                 }
             }
@@ -545,7 +717,7 @@ fun SettingsScreen(
             }
 
             // ── ÁLBUMES ──────────────────────────────────────────────────────
-            if (albums.isNotEmpty() && config.mediaFolderUris.isEmpty()) {
+            if (albums.isNotEmpty() && !config.hasCustomMediaFolders()) {
                 item {
                     Spacer(Modifier.height(8.dp))
                     SettingsSectionHeader("Álbumes seleccionados", Icons.Default.PhotoAlbum)
@@ -558,12 +730,11 @@ fun SettingsScreen(
                 }
 
                 item {
-                    LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        items(albums) { album ->
+                    if (device.isTv) {
+                        albums.forEach { album ->
                             val selected = config.selectedAlbumIds.contains(album.id)
-                            FilterChip(
+                            SettingsAlbumSelectRow(
+                                label = "${album.name} (${album.itemCount})",
                                 selected = selected,
                                 onClick = {
                                     val newIds = if (selected)
@@ -571,12 +742,30 @@ fun SettingsScreen(
                                     else
                                         config.selectedAlbumIds + album.id
                                     viewModel.updateSelectedAlbums(newIds)
-                                },
-                                label = { Text("${album.name} (${album.itemCount})") },
-                                leadingIcon = if (selected) {
-                                    { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
-                                } else null
+                                }
                             )
+                        }
+                    } else {
+                        LazyRow(
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            items(albums) { album ->
+                                val selected = config.selectedAlbumIds.contains(album.id)
+                                FilterChip(
+                                    selected = selected,
+                                    onClick = {
+                                        val newIds = if (selected)
+                                            config.selectedAlbumIds - album.id
+                                        else
+                                            config.selectedAlbumIds + album.id
+                                        viewModel.updateSelectedAlbums(newIds)
+                                    },
+                                    label = { Text("${album.name} (${album.itemCount})") },
+                                    leadingIcon = if (selected) {
+                                        { Icon(Icons.Default.Check, contentDescription = null, modifier = Modifier.size(16.dp)) }
+                                    } else null
+                                )
+                            }
                         }
                     }
                 }
@@ -586,6 +775,37 @@ fun SettingsScreen(
             item {
                 Spacer(Modifier.height(8.dp))
                 SettingsSectionHeader("Sistema", Icons.Default.Settings)
+            }
+
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.Info,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                            modifier = Modifier.size(if (device.isTv) 26.dp else 22.dp)
+                        )
+                        Text(
+                            text = "Versión de la app",
+                            fontSize = if (device.isTv) 16.sp else 14.sp
+                        )
+                    }
+                    AppVersionLabel(
+                        showBuildCode = true,
+                        fontSize = if (device.isTv) 15.sp else 14.sp,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
 
             item {
@@ -650,7 +870,16 @@ fun SettingsSwitchItem(
             )
             Text(text = title, fontSize = if (device.isTv) 16.sp else 14.sp)
         }
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        if (device.isTv) {
+            Icon(
+                imageVector = if (checked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (checked) "Activado" else "Desactivado",
+                tint = if (checked) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                modifier = Modifier.size(26.dp)
+            )
+        } else {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
     }
 }
 
@@ -676,15 +905,42 @@ fun SettingsSliderItem(
                 fontWeight = FontWeight.Medium
             )
         }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps,
-            modifier = Modifier
-                .fillMaxWidth()
-                .then(if (device.isTv) Modifier.focusable() else Modifier)
-        )
+        if (device.isTv) {
+            val step = if (steps > 0) {
+                (valueRange.endInclusive - valueRange.start) / (steps + 1)
+            } else {
+                (valueRange.endInclusive - valueRange.start) / 10f
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                TvStepperChip(
+                    icon = Icons.Default.Remove,
+                    desc = "Reducir",
+                    onClick = { onValueChange((value - step).coerceIn(valueRange.start, valueRange.endInclusive)) }
+                )
+                Text(
+                    valueLabel,
+                    color = MaterialTheme.colorScheme.primary,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.widthIn(min = 56.dp)
+                )
+                TvStepperChip(
+                    icon = Icons.Default.Add,
+                    desc = "Aumentar",
+                    onClick = { onValueChange((value + step).coerceIn(valueRange.start, valueRange.endInclusive)) }
+                )
+            }
+        } else {
+            Slider(
+                value = value,
+                onValueChange = onValueChange,
+                valueRange = valueRange,
+                steps = steps,
+                modifier = Modifier.fillMaxWidth()
+            )
+        }
     }
 }
 
@@ -699,11 +955,20 @@ fun SettingsDropdownItem(
     var expanded by remember { mutableStateOf(false) }
     val device = LocalDeviceProfile.current
 
+    fun cycleTvSelection() {
+        val idx = options.indexOf(currentValue).let { current ->
+            if (current < 0) 0 else (current + 1) % options.size
+        }
+        onSelect(idx)
+    }
+
     Box {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .safeClickable { expanded = true }
+                .safeClickable {
+                    if (device.isTv) cycleTvSelection() else expanded = true
+                }
                 .padding(vertical = if (device.isTv) 14.dp else 12.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -809,6 +1074,7 @@ fun folderLabel(uriString: String): String = LocalStorageBrowser.folderDisplayNa
 
 @Composable
 fun FolderChip(label: String, onRemove: () -> Unit) {
+    val device = LocalDeviceProfile.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -816,10 +1082,53 @@ fun FolderChip(label: String, onRemove: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        Text(text = label, maxLines = 1, modifier = Modifier.weight(1f))
-        IconButton(onClick = onRemove) {
-            Icon(Icons.Default.Delete, contentDescription = "Quitar carpeta")
+        Text(
+            text = label,
+            maxLines = 1,
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
+        )
+        Row(
+            modifier = Modifier
+                .safeClickable(onClick = onRemove)
+                .padding(horizontal = 12.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
+            Icon(
+                Icons.Default.Delete,
+                contentDescription = "Quitar carpeta",
+                tint = MaterialTheme.colorScheme.error
+            )
+            if (device.isTv) {
+                Text("Quitar", fontSize = 14.sp, color = MaterialTheme.colorScheme.error)
+            }
         }
+    }
+}
+
+@Composable
+fun SettingsAlbumSelectRow(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .safeClickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(text = label, fontSize = 15.sp)
+        Icon(
+            imageVector = if (selected) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+            contentDescription = if (selected) "Seleccionado" else "No seleccionado",
+            tint = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+            modifier = Modifier.size(24.dp)
+        )
     }
 }
 
@@ -830,14 +1139,100 @@ fun SettingsTextFieldItem(
     placeholder: String,
     onValueChange: (String) -> Unit
 ) {
+    val device = LocalDeviceProfile.current
     Column(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
         Text(text = title, modifier = Modifier.padding(bottom = 4.dp))
-        OutlinedTextField(
-            value = value,
-            onValueChange = onValueChange,
-            placeholder = { Text(placeholder) },
-            modifier = Modifier.fillMaxWidth(),
-            singleLine = true
+        if (device.isTv) {
+            Text(
+                text = value.ifBlank { placeholder },
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = if (value.isBlank()) 0.45f else 0.85f),
+                fontSize = 14.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(vertical = 8.dp)
+            )
+            Text(
+                text = "Edición de URL: disponible en móvil.",
+                fontSize = 11.sp,
+                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+            )
+        } else {
+            OutlinedTextField(
+                value = value,
+                onValueChange = onValueChange,
+                placeholder = { Text(placeholder) },
+                modifier = Modifier.fillMaxWidth(),
+                singleLine = true
+            )
+        }
+    }
+}
+
+@Composable
+private fun PlaybackBackgroundPreviewRow(
+    selected: PlaybackBackgroundType,
+    onSelect: (PlaybackBackgroundType) -> Unit
+) {
+    val demos = listOf(
+        PlaybackBackgroundType.DEMO_LAVENDER to "Lavanda",
+        PlaybackBackgroundType.DEMO_SUNSET to "Atardecer",
+        PlaybackBackgroundType.DEMO_MIDNIGHT to "Noche",
+        PlaybackBackgroundType.BLACK to "Negro"
+    )
+    Column(Modifier.fillMaxWidth().padding(vertical = 6.dp)) {
+        Text(
+            "Vista previa",
+            fontSize = 12.sp,
+            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+            modifier = Modifier.padding(bottom = 8.dp)
         )
+        LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            items(demos) { (type, label) ->
+                val isSelected = selected == type
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 80.dp, height = 52.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) MemoriaPurple else MemoriaLine,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .safeClickable { onSelect(type) }
+                    ) {
+                        PlaybackLetterboxBackground(
+                            type = type,
+                            customImageUri = "",
+                            modifier = Modifier.fillMaxSize()
+                        )
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text(label, fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+            item {
+                val isSelected = selected == PlaybackBackgroundType.CUSTOM_IMAGE
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    Box(
+                        modifier = Modifier
+                            .size(width = 80.dp, height = 52.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .border(
+                                width = if (isSelected) 2.dp else 1.dp,
+                                color = if (isSelected) MemoriaPurple else MemoriaLine,
+                                shape = RoundedCornerShape(10.dp)
+                            )
+                            .background(MaterialTheme.colorScheme.surfaceVariant)
+                            .safeClickable { onSelect(PlaybackBackgroundType.CUSTOM_IMAGE) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(Icons.Default.Image, null, tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text("Mía", fontSize = 10.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f))
+                }
+            }
+        }
     }
 }

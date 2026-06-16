@@ -1,19 +1,24 @@
 package com.dynamicframe.presentation.common
 
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.*
-import androidx.compose.runtime.Composable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.NostalgiaAccentDeep
+import com.dynamicframe.ui.theme.requestFocusWhenReady
 import com.dynamicframe.ui.theme.safeClickable
+import com.dynamicframe.ui.theme.tvFocusRequester
 
 @Composable
 fun ConfirmDeleteDialog(
@@ -25,15 +30,30 @@ fun ConfirmDeleteDialog(
 ) {
     if (!visible) return
     val device = LocalDeviceProfile.current
+    val cancelFocus = remember { FocusRequester() }
 
-    Dialog(onDismissRequest = onDismiss) {
+    LaunchedEffect(visible) {
+        if (visible && device.isTv) {
+            cancelFocus.requestFocusWhenReady()
+        }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = true,
+            dismissOnClickOutside = false
+        )
+    ) {
         Surface(
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
             tonalElevation = 6.dp
         ) {
             Column(
-                modifier = Modifier.padding(horizontal = 24.dp, vertical = 20.dp),
+                modifier = Modifier
+                    .padding(horizontal = 24.dp, vertical = 20.dp)
+                    .then(if (device.isTv) Modifier.focusGroup() else Modifier),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Icon(
@@ -60,7 +80,9 @@ fun ConfirmDeleteDialog(
                         label = "Cancelar",
                         primary = false,
                         onClick = onDismiss,
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(if (device.isTv) Modifier.tvFocusRequester(cancelFocus) else Modifier)
                     )
                     DialogActionButton(
                         label = "Borrar",

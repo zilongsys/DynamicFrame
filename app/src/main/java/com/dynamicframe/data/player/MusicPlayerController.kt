@@ -139,6 +139,9 @@ class MusicPlayerController @Inject constructor(
         val v = volume.coerceIn(0f, 1f)
         controller?.volume = v
         _state.value = _state.value.copy(volume = v)
+        if (_state.value.isDucked) {
+            volumeBeforeVideo = v
+        }
     }
 
     fun setShuffle(enabled: Boolean) {

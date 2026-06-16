@@ -18,6 +18,7 @@ interface MediaRepository {
 interface MusicRepository {
     suspend fun getLocalTracks(): Result<List<MusicTrack>>
     suspend fun getTracksFromFolder(folderUri: String): Result<List<MusicTrack>>
+    suspend fun getTracksFromFolders(folderUris: List<String>): Result<List<MusicTrack>>
     suspend fun getLocalAlbums(): Result<List<MediaAlbum>>
     fun observeLocalTracks(): Flow<List<MusicTrack>>
 }

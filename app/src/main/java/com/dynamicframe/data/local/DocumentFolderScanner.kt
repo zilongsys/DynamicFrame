@@ -72,7 +72,7 @@ class DocumentFolderScanner @Inject constructor(
         val name = file.name ?: queryDisplayName(uri) ?: "archivo"
         out.add(
             MediaItem(
-                id = "folder_${uri.hashCode()}",
+                id = "folder_${uri}",
                 uri = uri,
                 type = type,
                 source = MediaSource.LOCAL,
@@ -97,7 +97,7 @@ class DocumentFolderScanner @Inject constructor(
         val title = name.substringBeforeLast('.')
         out.add(
             MusicTrack(
-                id = "folder_music_${uri.hashCode()}",
+                id = "folder_music_${uri}",
                 uri = uri,
                 title = title,
                 artist = "Carpeta local",

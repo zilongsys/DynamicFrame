@@ -1,6 +1,8 @@
 package com.dynamicframe.presentation.browser
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -17,6 +19,8 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.dynamicframe.data.local.LocalStorageBrowser
 import com.dynamicframe.presentation.device.LocalDeviceProfile
+import com.dynamicframe.ui.theme.NostalgiaAccent
+import com.dynamicframe.ui.theme.NostalgiaSelected
 import com.dynamicframe.ui.theme.safeClickable
 import java.io.File
 
@@ -27,112 +31,203 @@ fun FolderBrowserDialog(
     onDismiss: () -> Unit,
     onSelectFolder: (String) -> Unit
 ) {
-    if (!visible) return
-
     val context = LocalContext.current
     val device = LocalDeviceProfile.current
-    var currentDir by remember { mutableStateOf<File?>(null) }
-    val roots = remember { LocalStorageBrowser.defaultRoots(context) }
+    val roots = remember(context) { LocalStorageBrowser.defaultRoots(context) }
 
-    val entries = remember(currentDir) {
-        if (currentDir == null) roots
-        else LocalStorageBrowser.listSubfolders(currentDir!!)
+    // Pila de navegación: vacía = pantalla de raíces
+    var navigationStack by remember { mutableStateOf<List<File>>(emptyList()) }
+
+    LaunchedEffect(visible) {
+        if (visible) navigationStack = emptyList()
     }
 
-    val pathLabel = currentDir?.absolutePath ?: "Ubicaciones"
+    if (!visible) return
 
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = !device.isTv)
-    ) {
-        Surface(
+    // En TV el botón Atrás del mando no debe cerrar el explorador al navegar carpetas
+    BackHandler {
+        if (navigationStack.isNotEmpty()) {
+            navigationStack = navigationStack.dropLast(1)
+        } else {
+            onDismiss()
+        }
+    }
+
+    val currentDir = navigationStack.lastOrNull()
+    val entries = remember(currentDir, roots) {
+        if (currentDir == null) roots
+        else LocalStorageBrowser.listSubfolders(currentDir)
+    }
+
+    val pathLabel = when {
+        currentDir != null -> currentDir.absolutePath
+        else -> "Elige ubicación — USB suele estar en «Todos los discos» o «USB/SD»"
+    }
+
+    val browserContent: @Composable () -> Unit = {
+        Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight(if (device.isTv) 0.92f else 0.75f),
-            shape = MaterialTheme.shapes.large,
-            tonalElevation = 4.dp
+                .fillMaxSize()
+                .then(if (device.isTv) Modifier.focusGroup() else Modifier)
         ) {
-            Column(modifier = Modifier.fillMaxSize()) {
+            // Cabecera
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surfaceVariant)
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                    Text(
+                        pathLabel,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 3
+                    )
+                }
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    modifier = Modifier.safeClickable(onClick = onDismiss),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                        Text(
-                            pathLabel,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 2
-                        )
-                    }
-                    IconButton(onClick = onDismiss) {
-                        Icon(Icons.Default.Close, contentDescription = "Cerrar")
-                    }
-                }
-
-                if (currentDir != null) {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .safeClickable {
-                                onSelectFolder(LocalStorageBrowser.toFolderUri(currentDir!!))
-                                onDismiss()
-                            }
-                            .padding(horizontal = 16.dp, vertical = 14.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(12.dp)
-                    ) {
-                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
-                        Text(
-                            "Usar esta carpeta",
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    }
-                    HorizontalDivider()
-                }
-
-                LazyColumn(
-                    modifier = Modifier.fillMaxSize(),
-                    contentPadding = PaddingValues(vertical = 8.dp)
-                ) {
-                    if (currentDir != null) {
-                        item {
-                            FolderRow(
-                                name = "Subir (..)",
-                                icon = Icons.Default.ArrowUpward,
-                                onClick = {
-                                    currentDir = currentDir?.parentFile?.takeIf { it.canRead() }
-                                }
-                            )
-                        }
-                    }
-
-                    items(entries, key = { it.path.absolutePath }) { entry ->
-                        FolderRow(
-                            name = entry.name,
-                            icon = Icons.Default.Folder,
-                            onClick = { currentDir = entry.path }
-                        )
-                    }
-
-                    if (entries.isEmpty() && currentDir != null) {
-                        item {
-                            Text(
-                                "No hay subcarpetas aquí. Pulsa «Usar esta carpeta».",
-                                modifier = Modifier.padding(16.dp),
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
+                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                    if (device.isTv) {
+                        Text("Cerrar", fontSize = MaterialTheme.typography.bodySmall.fontSize)
                     }
                 }
             }
+
+            // Acciones de navegación
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(NostalgiaSelected.copy(alpha = 0.35f))
+                    .padding(horizontal = 8.dp, vertical = 4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                if (navigationStack.isNotEmpty()) {
+                    NavActionChip(
+                        label = "Atrás (..)",
+                        icon = Icons.Default.ArrowUpward,
+                        onClick = { navigationStack = navigationStack.dropLast(1) }
+                    )
+                }
+                if (currentDir != null && currentDir.canRead()) {
+                    NavActionChip(
+                        label = "Usar esta carpeta",
+                        icon = Icons.Default.CheckCircle,
+                        primary = true,
+                        onClick = {
+                            onSelectFolder(LocalStorageBrowser.toFolderUri(currentDir))
+                            onDismiss()
+                        }
+                    )
+                }
+                if (navigationStack.isNotEmpty()) {
+                    NavActionChip(
+                        label = "Inicio",
+                        icon = Icons.Default.Home,
+                        onClick = { navigationStack = emptyList() }
+                    )
+                }
+            }
+
+            HorizontalDivider()
+
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(vertical = 8.dp)
+            ) {
+                if (entries.isEmpty()) {
+                    item {
+                        Text(
+                            text = if (currentDir == null) {
+                                "No se detectaron ubicaciones. Conecta un USB y vuelve a abrir el explorador."
+                            } else {
+                                "Sin subcarpetas visibles. Pulsa «Usar esta carpeta» si tus fotos están aquí."
+                            },
+                            modifier = Modifier.padding(16.dp),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                items(entries, key = { it.path.absolutePath }) { entry ->
+                    FolderRow(
+                        name = entry.name,
+                        icon = when {
+                            !entry.readable -> Icons.Default.Lock
+                            currentDir == null && entry.name.contains("USB", ignoreCase = true) -> Icons.Default.Usb
+                            else -> Icons.Default.Folder
+                        },
+                        enabled = entry.readable,
+                        onClick = {
+                            if (entry.readable) {
+                                navigationStack = navigationStack + entry.path
+                            }
+                        }
+                    )
+                }
+            }
         }
+    }
+
+    Dialog(
+        onDismissRequest = onDismiss,
+        properties = DialogProperties(
+            dismissOnBackPress = false,
+            dismissOnClickOutside = false,
+            usePlatformDefaultWidth = !device.isTv,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        Surface(
+            modifier = if (device.isTv) {
+                Modifier.fillMaxSize()
+            } else {
+                Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight(0.8f)
+            },
+            shape = if (device.isTv) MaterialTheme.shapes.extraSmall else MaterialTheme.shapes.large,
+            tonalElevation = 4.dp
+        ) {
+            browserContent()
+        }
+    }
+}
+
+@Composable
+private fun NavActionChip(
+    label: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    primary: Boolean = false,
+    onClick: () -> Unit
+) {
+    val bg = if (primary) NostalgiaAccent.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surface
+    Row(
+        modifier = Modifier
+            .safeClickable(onClick = onClick)
+            .background(bg, MaterialTheme.shapes.small)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (primary) NostalgiaAccent else MaterialTheme.colorScheme.onSurface,
+            modifier = Modifier.size(20.dp)
+        )
+        Text(
+            label,
+            fontWeight = if (primary) FontWeight.SemiBold else FontWeight.Normal,
+            color = if (primary) NostalgiaAccent else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium
+        )
     }
 }
 
@@ -140,17 +235,31 @@ fun FolderBrowserDialog(
 private fun FolderRow(
     name: String,
     icon: androidx.compose.ui.graphics.vector.ImageVector,
+    enabled: Boolean = true,
     onClick: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .safeClickable(onClick = onClick)
+            .then(
+                if (enabled) Modifier.safeClickable(onClick = onClick)
+                else Modifier
+            )
             .padding(horizontal = 16.dp, vertical = 14.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
-        Text(name, style = MaterialTheme.typography.bodyLarge)
+        Icon(
+            icon,
+            contentDescription = null,
+            tint = if (enabled) MaterialTheme.colorScheme.onSurfaceVariant
+            else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
+        )
+        Text(
+            name,
+            style = MaterialTheme.typography.bodyLarge,
+            color = if (enabled) MaterialTheme.colorScheme.onSurface
+            else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f)
+        )
     }
 }

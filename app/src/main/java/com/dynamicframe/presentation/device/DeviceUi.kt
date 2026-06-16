@@ -69,7 +69,7 @@ fun deviceUiProfile(isTv: Boolean): DeviceUiProfile = if (isTv) {
         clockCompactSp = 56.sp,
         contentPaddingH = 32.dp,
         contentPaddingV = 28.dp,
-        sidebarWidth = 248.dp
+        sidebarWidth = 220.dp
     )
 } else {
     DeviceUiProfile(

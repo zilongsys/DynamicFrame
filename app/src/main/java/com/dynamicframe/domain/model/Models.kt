@@ -92,12 +92,13 @@ data class SlideshowConfig(
     val musicPlaylistId: String? = null,
     val autoStartOnBoot: Boolean = false,
     val screenSaverMode: Boolean = false,
-    // Carpetas de fotos/videos (SAF). Vacío = MediaStore / álbumes
-    val mediaFolderUris: List<String> = emptyList(),
+    // Carpetas locales (SAF / file). Vacías = galería del dispositivo
+    val photoFolderUris: List<String> = emptyList(),
+    val videoFolderUris: List<String> = emptyList(),
     val mediaContentFilter: MediaContentFilter = MediaContentFilter.ALL,
     // Música de fondo
     val musicSourceType: MusicSourceType = MusicSourceType.DEVICE_LIBRARY,
-    val musicFolderUri: String? = null,
+    val musicFolderUris: List<String> = emptyList(),
     val musicTheme: MusicTheme = MusicTheme.RELAX,
     val spotifyPlaylistUrl: String = "",
     val youtubePlaylistUrl: String = "",
@@ -112,8 +113,29 @@ data class SlideshowConfig(
     val transitionDurationMs: Int = 1400,
     // Ajuste pantalla TV (overscan / zoom)
     val showScreenBorder: Boolean = false,
-    val uiScale: Float = 1.0f
+    val uiScale: Float = 1.0f,
+    /** Marco dorado estilo cuadro alrededor del slideshow */
+    val showPictureFrame: Boolean = false,
+    /** Borde rosa de zona segura solo en pantalla completa */
+    val playbackShowSafeBorder: Boolean = false,
+    /** Grosor del marco dorado en pantalla completa (0.5 = fino, 1.5 = grueso) */
+    val playbackPictureFrameScale: Float = 1.0f,
+    /** Zoom del contenido en pantalla completa (1.0 = borde a borde) */
+    val playbackContentZoom: Float = 1.0f,
+    /** Fondo detrás de fotos/vídeos (letterbox) */
+    val playbackBackgroundType: PlaybackBackgroundType = PlaybackBackgroundType.DEMO_LAVENDER,
+    /** URI de imagen personalizada para fondo (si type = CUSTOM_IMAGE) */
+    val playbackBackgroundImageUri: String = ""
 )
+
+/** Fondo visible en los márgenes cuando la foto no llena el marco */
+enum class PlaybackBackgroundType {
+    BLACK,
+    DEMO_LAVENDER,
+    DEMO_SUNSET,
+    DEMO_MIDNIGHT,
+    CUSTOM_IMAGE
+}
 
 enum class TransitionType {
     CROSSFADE,

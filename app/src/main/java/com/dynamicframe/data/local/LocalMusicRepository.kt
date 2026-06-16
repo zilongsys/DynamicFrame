@@ -84,8 +84,19 @@ class LocalMusicRepository @Inject constructor(
         }
 
     override suspend fun getTracksFromFolder(folderUri: String): Result<List<MusicTrack>> =
+        getTracksFromFolders(listOf(folderUri))
+
+    override suspend fun getTracksFromFolders(folderUris: List<String>): Result<List<MusicTrack>> =
         withContext(Dispatchers.IO) {
-            runCatching { folderScanner.scanMusicFolder(folderUri) }
+            runCatching {
+                val tracks = linkedMapOf<String, MusicTrack>()
+                folderUris.distinct().forEach { uri ->
+                    folderScanner.scanMusicFolder(uri).forEach { track ->
+                        tracks[track.id] = track
+                    }
+                }
+                tracks.values.sortedBy { it.title.lowercase() }
+            }
         }
 
     override suspend fun getLocalAlbums(): Result<List<MediaAlbum>> =

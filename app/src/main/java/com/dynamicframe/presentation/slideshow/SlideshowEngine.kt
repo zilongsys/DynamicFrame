@@ -8,6 +8,8 @@ import com.dynamicframe.domain.usecase.GetSlideshowItemsUseCase
 import com.dynamicframe.domain.usecase.ObserveSlideshowConfigUseCase
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.*
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -17,6 +19,7 @@ class SlideshowEngine @Inject constructor(
     private val observeConfig: ObserveSlideshowConfigUseCase
 ) {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private val loadMutex = Mutex()
 
     private val _state = MutableStateFlow(SlideshowState())
     val state: StateFlow<SlideshowState> = _state.asStateFlow()
@@ -27,9 +30,10 @@ class SlideshowEngine @Inject constructor(
     private var mediaItems: List<MediaItem> = emptyList()
     private var shuffledItems: List<MediaItem> = emptyList()
     private var timerJob: Job? = null
+    private var transitionJob: Job? = null
     private var isInitialized = false
     private var lastMediaKey: String = ""
-    private var lastIntervalSeconds: Int = -1
+    private var lastScheduleKey: String = ""
 
     init {
         scope.launch {
@@ -37,7 +41,7 @@ class SlideshowEngine @Inject constructor(
                 val previousConfig = _config.value
                 _config.value = config
 
-                val mediaKey = "${config.mediaFolderUris}|${config.mediaContentFilter}|${config.selectedAlbumIds}"
+                val mediaKey = "${config.photoFolderUris}|${config.videoFolderUris}|${config.mediaContentFilter}|${config.selectedAlbumIds}"
                 if (mediaKey != lastMediaKey) {
                     lastMediaKey = mediaKey
                     if (isInitialized) loadMedia()
@@ -45,8 +49,9 @@ class SlideshowEngine @Inject constructor(
                     applyShuffleKeepingCurrent(config.shuffle)
                 }
 
-                if (config.intervalSeconds != lastIntervalSeconds) {
-                    lastIntervalSeconds = config.intervalSeconds
+                val scheduleKey = "${config.intervalSeconds}|${config.videoPlayFull}|${config.loop}"
+                if (scheduleKey != lastScheduleKey) {
+                    lastScheduleKey = scheduleKey
                     if (_state.value.isPlaying) scheduleNext()
                 }
             }
@@ -57,26 +62,52 @@ class SlideshowEngine @Inject constructor(
         if (isInitialized) return
         loadMedia()
         isInitialized = true
-        lastIntervalSeconds = _config.value.intervalSeconds
+        lastScheduleKey = scheduleKeyFor(_config.value)
     }
 
-    suspend fun loadMedia() {
-        _state.value = _state.value.copy(error = null)
+    suspend fun loadMedia() = loadMutex.withLock {
+        val previous = _state.value
         val result = getSlideshowItems()
         result.onSuccess { items ->
             mediaItems = items
             shuffledItems = if (_config.value.shuffle) items.shuffled() else items
-            _state.value = _state.value.copy(
+
+            if (shuffledItems.isEmpty()) {
+                timerJob?.cancel()
+                _state.value = previous.copy(
+                    totalItems = 0,
+                    allItems = emptyList(),
+                    playlistItems = emptyList(),
+                    currentItem = null,
+                    currentIndex = 0,
+                    nextItem = null,
+                    error = "No hay fotos o videos. Configura carpetas en Ajustes."
+                )
+                return@withLock
+            }
+
+            val previousId = previous.currentItem?.id
+            val newIndex = when {
+                previousId != null -> {
+                    val idx = shuffledItems.indexOfFirst { it.id == previousId }
+                    if (idx >= 0) idx else previous.currentIndex.coerceIn(0, shuffledItems.lastIndex)
+                }
+                else -> previous.currentIndex.coerceIn(0, shuffledItems.lastIndex)
+            }
+
+            _state.value = previous.copy(
                 totalItems = items.size,
                 allItems = items,
                 playlistItems = shuffledItems,
-                currentItem = shuffledItems.firstOrNull(),
-                currentIndex = 0,
-                error = if (items.isEmpty()) "No hay fotos o videos. Configura carpetas en Ajustes." else null
+                currentIndex = newIndex,
+                currentItem = shuffledItems[newIndex],
+                error = null,
+                isTransitioning = false
             )
-            preloadNext(0)
+            preloadNext(newIndex)
+            if (_state.value.isPlaying) scheduleNext()
         }.onFailure { e ->
-            _state.value = _state.value.copy(error = e.message ?: "Error al cargar medios")
+            _state.value = previous.copy(error = e.message ?: "Error al cargar medios")
         }
     }
 
@@ -107,6 +138,7 @@ class SlideshowEngine @Inject constructor(
 
     fun stop() {
         pause()
+        transitionJob?.cancel()
         _state.value = SlideshowState()
         mediaItems = emptyList()
         shuffledItems = emptyList()
@@ -163,8 +195,10 @@ class SlideshowEngine @Inject constructor(
         if (_state.value.isPlaying) scheduleNext()
     }
 
+    /** Solo avanza al terminar el vídeo si está configurado «reproducir completo». */
     fun onVideoCompleted() {
         if (!_state.value.isPlaying) return
+        if (!_config.value.videoPlayFull) return
         val nextIdx = nextIndex()
         if (nextIdx == null) pause() else navigateTo(nextIdx)
     }
@@ -189,6 +223,7 @@ class SlideshowEngine @Inject constructor(
 
     private fun navigateTo(index: Int) {
         timerJob?.cancel()
+        transitionJob?.cancel()
         if (shuffledItems.isEmpty()) return
 
         val safeIndex = index.coerceIn(0, shuffledItems.lastIndex)
@@ -202,10 +237,13 @@ class SlideshowEngine @Inject constructor(
             isTransitioning = true
         )
 
-        scope.launch {
+        val itemId = item.id
+        transitionJob = scope.launch {
             val ms = transitionMillis(_config.value.transition, _config.value.transitionDurationMs)
             delay(ms.coerceAtLeast(300).toLong())
-            _state.value = _state.value.copy(isTransitioning = false)
+            if (_state.value.currentItem?.id == itemId) {
+                _state.value = _state.value.copy(isTransitioning = false)
+            }
         }
 
         if (_state.value.isPlaying) {
@@ -213,7 +251,6 @@ class SlideshowEngine @Inject constructor(
         }
     }
 
-    /** null = fin del slideshow cuando loop está desactivado */
     private fun nextIndex(): Int? {
         if (shuffledItems.isEmpty()) return null
         val current = _state.value.currentIndex
@@ -231,4 +268,7 @@ class SlideshowEngine @Inject constructor(
             nextItem = shuffledItems.getOrNull(nextIndex)
         )
     }
+
+    private fun scheduleKeyFor(config: SlideshowConfig): String =
+        "${config.intervalSeconds}|${config.videoPlayFull}|${config.loop}"
 }

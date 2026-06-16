@@ -16,6 +16,8 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 @HiltViewModel
@@ -25,6 +27,8 @@ class SettingsViewModel @Inject constructor(
     private val settingsRepository: SettingsRepository,
     private val getLocalAlbums: GetLocalAlbumsUseCase
 ) : ViewModel() {
+
+    private val configMutex = Mutex()
 
     val config: StateFlow<SlideshowConfig> = observeConfig()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SlideshowConfig())
@@ -72,18 +76,60 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch { settingsRepository.updateSelectedAlbums(albumIds) }
     }
 
-    fun addMediaFolder(uri: String) {
-        val current = config.value
-        if (current.mediaFolderUris.contains(uri)) return
-        updateConfig(current.copy(mediaFolderUris = current.mediaFolderUris + uri))
+    fun addPhotoFolder(uri: String) {
+        viewModelScope.launch {
+            configMutex.withLock {
+                val current = settingsRepository.getConfig()
+                if (current.photoFolderUris.contains(uri)) return@withLock
+                saveConfig(current.copy(photoFolderUris = current.photoFolderUris + uri))
+            }
+        }
     }
 
-    fun removeMediaFolder(uri: String) {
-        val current = config.value
-        updateConfig(current.copy(mediaFolderUris = current.mediaFolderUris - uri))
+    fun removePhotoFolder(uri: String) {
+        viewModelScope.launch {
+            configMutex.withLock {
+                val current = settingsRepository.getConfig()
+                saveConfig(current.copy(photoFolderUris = current.photoFolderUris - uri))
+            }
+        }
     }
 
-    fun setMusicFolder(uri: String?) {
-        updateConfig(config.value.copy(musicFolderUri = uri))
+    fun addVideoFolder(uri: String) {
+        viewModelScope.launch {
+            configMutex.withLock {
+                val current = settingsRepository.getConfig()
+                if (current.videoFolderUris.contains(uri)) return@withLock
+                saveConfig(current.copy(videoFolderUris = current.videoFolderUris + uri))
+            }
+        }
+    }
+
+    fun removeVideoFolder(uri: String) {
+        viewModelScope.launch {
+            configMutex.withLock {
+                val current = settingsRepository.getConfig()
+                saveConfig(current.copy(videoFolderUris = current.videoFolderUris - uri))
+            }
+        }
+    }
+
+    fun addMusicFolder(uri: String) {
+        viewModelScope.launch {
+            configMutex.withLock {
+                val current = settingsRepository.getConfig()
+                if (current.musicFolderUris.contains(uri)) return@withLock
+                saveConfig(current.copy(musicFolderUris = current.musicFolderUris + uri))
+            }
+        }
+    }
+
+    fun removeMusicFolder(uri: String) {
+        viewModelScope.launch {
+            configMutex.withLock {
+                val current = settingsRepository.getConfig()
+                saveConfig(current.copy(musicFolderUris = current.musicFolderUris - uri))
+            }
+        }
     }
 }

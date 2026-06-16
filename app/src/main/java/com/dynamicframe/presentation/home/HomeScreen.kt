@@ -38,6 +38,7 @@ import com.dynamicframe.BuildConfig
 import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.SlideshowConfig
+import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.presentation.browser.FolderBrowserDialog
 import com.dynamicframe.presentation.browser.StoragePicker
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
@@ -55,6 +56,8 @@ import com.dynamicframe.presentation.slideshow.AlbumPillOption
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.slideshow.SlideshowViewModel
 import com.dynamicframe.ui.theme.NostalgiaAccent
+import com.dynamicframe.ui.theme.NostalgiaActionButton
+import com.dynamicframe.ui.theme.AppVersionLabel
 import com.dynamicframe.ui.theme.NostalgiaCard
 import com.dynamicframe.ui.theme.PaperBackground
 import com.dynamicframe.ui.theme.PaperInk
@@ -76,9 +79,7 @@ fun HomeScreen(
     slideshowViewModel: SlideshowViewModel = hiltViewModel(),
     settingsViewModel: SettingsViewModel = hiltViewModel()
 ) {
-    var section by remember { mutableStateOf(HomeSection.SLIDESHOW) }
-    var sidebarVisible by remember { mutableStateOf(isTV) }
-    var largeClock by remember { mutableStateOf(true) }
+    var destination by remember { mutableStateOf<MemoriaDestination>(MemoriaDestination.AlbumActive) }
 
     val device = LocalDeviceProfile.current
 
@@ -90,19 +91,8 @@ fun HomeScreen(
     val settingsConfig by settingsViewModel.config.collectAsStateWithLifecycle()
     val albums by settingsViewModel.albums.collectAsStateWithLifecycle()
 
-    var currentTime by remember { mutableStateOf("") }
-    var currentDate by remember { mutableStateOf("") }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val toastMessage by slideshowViewModel.toastMessage.collectAsStateWithLifecycle()
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            val now = Date()
-            currentTime = SimpleDateFormat("HH:mm", Locale.getDefault()).format(now)
-            currentDate = SimpleDateFormat("EEEE, d 'de' MMMM", Locale.forLanguageTag("es")).format(now)
-            delay(1000)
-        }
-    }
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(toastMessage) {
@@ -120,34 +110,33 @@ fun HomeScreen(
         onDismiss = { showDeleteConfirm = false }
     )
 
+    val albumLabel = albumPills.find { it.id == selectedAlbumId }?.label
+        ?: albumPills.firstOrNull()?.label
+        ?: "Álbum activo"
+
     val mainContent: @Composable () -> Unit = {
-        when (section) {
-            HomeSection.SLIDESHOW -> SlideshowPanel(
-                largeClock = largeClock,
-                currentTime = currentTime,
-                currentDate = currentDate,
+        when (val dest = destination) {
+            MemoriaDestination.AlbumActive -> MemoriaDashboard(
                 slideshowState = slideshowState,
-                config = config,
+                config = settingsConfig,
                 musicState = musicState,
+                albumLabel = albumLabel,
                 onPlayPause = {
                     if (slideshowState.isPlaying) slideshowViewModel.pauseSlideshow()
                     else slideshowViewModel.startSlideshow()
                 },
-                onNextSlide = slideshowViewModel::nextSlide,
-                onPreviousSlide = slideshowViewModel::previousSlide,
-                onToggleMusic = slideshowViewModel::toggleMusicPlayback,
-                onSkipTrack = slideshowViewModel::skipNextTrack,
-                onSelectThumbnail = slideshowViewModel::jumpToSlide,
+                onNext = slideshowViewModel::nextSlide,
+                onPrev = slideshowViewModel::previousSlide,
                 onOpenFullscreen = onOpenFullscreen,
-                onDeleteCurrent = { showDeleteConfirm = true },
                 onIntervalChange = settingsViewModel::updateInterval,
-                largeClockToggle = { largeClock = it },
-                sidebarVisible = sidebarVisible,
-                onSidebarToggle = { sidebarVisible = it },
-                canDelete = slideshowState.currentItem != null
+                onTransitionChange = settingsViewModel::updateTransition,
+                onShuffleChange = { settingsViewModel.updateConfig(settingsConfig.copy(shuffle = it)) },
+                onLoopChange = { settingsViewModel.updateConfig(settingsConfig.copy(loop = it)) },
+                onVolumeChange = settingsViewModel::updateMusicVolume,
+                onUpdateConfig = settingsViewModel::updateConfig
             )
 
-            HomeSection.ALBUMS -> AlbumsPanel(
+            MemoriaDestination.Albums -> AlbumsPanel(
                 albumPills = albumPills,
                 albums = albums,
                 selectedAlbumId = selectedAlbumId,
@@ -156,26 +145,31 @@ fun HomeScreen(
                 onReload = slideshowViewModel::reloadMedia
             )
 
-            HomeSection.MUSIC -> MusicPanel(
+            MemoriaDestination.Music -> MusicPanel(
                 config = settingsConfig,
                 musicState = musicState,
+                isPlaybackActive = slideshowState.isPlaying,
                 onUpdateConfig = settingsViewModel::updateConfig,
                 onUpdateVolume = settingsViewModel::updateMusicVolume,
                 onToggleMusic = slideshowViewModel::toggleMusicPlayback,
                 onSkipTrack = slideshowViewModel::skipNextTrack
             )
 
-            HomeSection.SETTINGS -> SettingsPanel(
+            MemoriaDestination.Settings -> SettingsPanel(
                 settingsViewModel = settingsViewModel,
                 onReloadMedia = slideshowViewModel::reloadMedia
             )
+
+            MemoriaDestination.FeatureCatalog -> FeatureCatalogPanel()
+
+            is MemoriaDestination.Roadmap -> ComingSoonPanel(dest.feature)
         }
     }
 
     if (device.useSidebarNav) {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            containerColor = PaperBackground
+            containerColor = com.dynamicframe.ui.theme.MemoriaBg
         ) { padding ->
             Row(
                 modifier = Modifier
@@ -183,14 +177,11 @@ fun HomeScreen(
                     .padding(padding)
                     .then(if (device.isTv) Modifier.focusGroup() else Modifier)
             ) {
-                if (sidebarVisible) {
-                    EditorialSidebar(
-                        selected = section,
-                        photoCount = slideshowState.totalItems,
-                        currentIndex = slideshowState.currentIndex,
-                        onSelect = { section = it }
-                    )
-                }
+                MemoriaSidebar(
+                    selected = destination,
+                    photoCount = slideshowState.totalItems,
+                    onSelect = { destination = it }
+                )
                 Column(
                     modifier = Modifier
                         .weight(1f)
@@ -199,6 +190,7 @@ fun HomeScreen(
                             horizontal = device.contentPaddingH,
                             vertical = device.contentPaddingV
                         )
+                        .then(if (device.isTv) Modifier.focusGroup() else Modifier)
                 ) {
                     mainContent()
                 }
@@ -207,9 +199,19 @@ fun HomeScreen(
     } else {
         Scaffold(
             snackbarHost = { SnackbarHost(snackbarHostState) },
-            containerColor = PaperBackground,
+            containerColor = com.dynamicframe.ui.theme.MemoriaBg,
             bottomBar = {
-                PhoneBottomNav(selected = section, onSelect = { section = it })
+                Column {
+                    MemoriaPhoneBottomNav(selected = destination, onSelect = { destination = it })
+                    AppVersionLabel(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .background(com.dynamicframe.ui.theme.MemoriaSurface)
+                            .padding(bottom = 6.dp),
+                        fontSize = 10.sp,
+                        showBuildCode = true
+                    )
+                }
             }
         ) { padding ->
             Column(
@@ -727,15 +729,29 @@ private fun QuickSettingRowWithSwitch(
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit
 ) {
+    val device = LocalDeviceProfile.current
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 6.dp),
+            .then(
+                if (device.isTv) Modifier.safeClickable { onCheckedChange(!checked) }
+                else Modifier
+            )
+            .padding(vertical = if (device.isTv) 10.dp else 6.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(label, color = PaperInk, fontSize = 15.sp)
-        Switch(checked = checked, onCheckedChange = onCheckedChange)
+        if (device.isTv) {
+            Icon(
+                imageVector = if (checked) Icons.Default.CheckCircle else Icons.Default.RadioButtonUnchecked,
+                contentDescription = if (checked) "Activado" else "Desactivado",
+                tint = if (checked) NostalgiaAccent else PaperMuted,
+                modifier = Modifier.size(24.dp)
+            )
+        } else {
+            Switch(checked = checked, onCheckedChange = onCheckedChange)
+        }
     }
 }
 
@@ -757,7 +773,7 @@ private fun DeviceActionButton(
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(if (destructive) NostalgiaSelected else PaperSurface)
+                .background(if (destructive) PaperSelected else PaperSurface)
                 .border(1.dp, borderColor, RoundedCornerShape(50))
                 .safeClickable(onClick = onClick)
                 .padding(horizontal = 14.dp, vertical = 10.dp),
@@ -772,7 +788,7 @@ private fun DeviceActionButton(
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(if (destructive) NostalgiaSelected else PaperSurface)
+                .background(if (destructive) PaperSelected else PaperSurface)
                 .border(1.dp, borderColor, CircleShape)
                 .safeClickable(onClick = onClick, showFocusBorder = false),
             contentAlignment = Alignment.Center
@@ -784,7 +800,7 @@ private fun DeviceActionButton(
             onClick = onClick,
             modifier = Modifier
                 .size(size)
-                .background(if (destructive) NostalgiaSelected else PaperSurface, CircleShape)
+                .background(if (destructive) PaperSelected else PaperSurface, CircleShape)
                 .border(1.dp, borderColor, CircleShape)
         ) {
             Icon(icon, contentDescription = label, tint = iconTint)
@@ -801,7 +817,12 @@ private fun AlbumsPanel(
     onSelectAlbum: (String?) -> Unit,
     onReload: () -> Unit
 ) {
-    Column(modifier = Modifier.fillMaxSize()) {
+    val device = LocalDeviceProfile.current
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .then(if (device.isTv) Modifier.focusGroup() else Modifier)
+    ) {
         Text("Álbumes", style = MaterialTheme.typography.titleMedium, color = PaperInk)
         Spacer(Modifier.height(8.dp))
         Text(
@@ -811,12 +832,12 @@ private fun AlbumsPanel(
         )
         Spacer(Modifier.height(20.dp))
 
-        if (config.mediaFolderUris.isNotEmpty()) {
+        if (config.hasCustomMediaFolders()) {
             albumPills.forEach { pill ->
                 AlbumSelectRow(
                     label = pill.label,
                     selected = pill.id == selectedAlbumId || (pill.id == null && selectedAlbumId == null),
-                    onClick = { onSelectAlbum(pill.id); onReload() }
+                    onClick = { onSelectAlbum(pill.id) }
                 )
             }
         } else if (albums.isNotEmpty()) {
@@ -828,7 +849,6 @@ private fun AlbumsPanel(
                         val ids = if (config.selectedAlbumIds.contains(album.id)) emptyList()
                         else listOf(album.id)
                         onSelectAlbum(ids.singleOrNull())
-                        onReload()
                     }
                 )
             }
@@ -864,6 +884,7 @@ private fun AlbumSelectRow(label: String, selected: Boolean, onClick: () -> Unit
 private fun MusicPanel(
     config: SlideshowConfig,
     musicState: com.dynamicframe.domain.model.MusicPlayerState,
+    isPlaybackActive: Boolean,
     onUpdateConfig: (SlideshowConfig) -> Unit,
     onUpdateVolume: (Float) -> Unit,
     onToggleMusic: () -> Unit,
@@ -883,7 +904,10 @@ private fun MusicPanel(
                 it,
                 Intent.FLAG_GRANT_READ_URI_PERMISSION
             )
-            onUpdateConfig(config.copy(musicFolderUri = it.toString()))
+            val folders = config.musicFolderUris
+            if (!folders.contains(it.toString())) {
+                onUpdateConfig(config.copy(musicFolderUris = folders + it.toString()))
+            }
         }
     }
 
@@ -892,11 +916,17 @@ private fun MusicPanel(
         title = "Carpeta de música",
         onDismiss = { showMusicFolderBrowser = false },
         onSelectFolder = { uri ->
-            onUpdateConfig(config.copy(musicFolderUri = uri))
+            if (!config.musicFolderUris.contains(uri)) {
+                onUpdateConfig(config.copy(musicFolderUris = config.musicFolderUris + uri))
+            }
+            showMusicFolderBrowser = false
         }
     )
 
-    LazyColumn(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+    LazyColumn(
+        modifier = if (device.isTv) Modifier.focusGroup() else Modifier,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
         item {
             Text("Música", style = MaterialTheme.typography.titleMedium, color = PaperInk)
             Spacer(Modifier.height(16.dp))
@@ -926,24 +956,43 @@ private fun MusicPanel(
 
         if (config.musicSourceType == com.dynamicframe.domain.model.MusicSourceType.LOCAL_FOLDER) {
             item {
-                OutlinedButton(
+                NostalgiaActionButton(
+                    text = if (useInAppBrowser) "Añadir carpeta de música"
+                    else "Elegir carpeta de música",
+                    icon = Icons.Default.FolderOpen,
                     onClick = {
                         permissions.requestFor(MediaPermissionKind.MUSIC) {
                             if (useInAppBrowser) showMusicFolderBrowser = true
                             else musicFolderLauncher.launch(null)
                         }
-                    },
-                    modifier = Modifier.fillMaxWidth()
+                    }
+                )
+            }
+            items(config.musicFolderUris) { uri ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(PaperSurface)
+                        .padding(start = 14.dp, top = 10.dp, bottom = 10.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Default.FolderOpen, contentDescription = null)
-                    Spacer(Modifier.width(8.dp))
-                    Text(
-                        when {
-                            config.musicFolderUri != null -> "Cambiar: ${folderLabel(config.musicFolderUri!!)}"
-                            useInAppBrowser -> "Explorar carpeta de música"
-                            else -> "Elegir carpeta de música"
+                    Text(folderLabel(uri), color = PaperInk, maxLines = 1, modifier = Modifier.weight(1f))
+                    Row(
+                        modifier = Modifier
+                            .safeClickable {
+                                onUpdateConfig(config.copy(musicFolderUris = config.musicFolderUris - uri))
+                            }
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Quitar", tint = PaperMuted)
+                        if (device.isTv) {
+                            Text("Quitar", color = PaperMuted, fontSize = 14.sp)
                         }
-                    )
+                    }
                 }
             }
         }
@@ -951,8 +1000,8 @@ private fun MusicPanel(
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 DeviceActionButton(
-                    icon = if (musicState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                    label = if (musicState.isPlaying) "Pausar" else "Reproducir",
+                    icon = if (isPlaybackActive) Icons.Default.Pause else Icons.Default.PlayArrow,
+                    label = if (isPlaybackActive) "Pausar" else "Reproducir",
                     onClick = onToggleMusic
                 )
                 DeviceActionButton(

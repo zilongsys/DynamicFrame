@@ -10,11 +10,17 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import com.dynamicframe.data.player.MusicPlayerController
 import com.dynamicframe.presentation.AppRoot
+import com.dynamicframe.presentation.slideshow.SlideshowEngine
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+
+    @Inject lateinit var slideshowEngine: SlideshowEngine
+    @Inject lateinit var musicController: MusicPlayerController
 
     val isTV: Boolean
         get() {
@@ -35,5 +41,19 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppRoot(isTV = isTV)
         }
+    }
+
+    override fun onStop() {
+        super.onStop()
+        slideshowEngine.pause()
+        musicController.pause()
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) {
+            slideshowEngine.pause()
+            musicController.disconnect()
+        }
+        super.onDestroy()
     }
 }
