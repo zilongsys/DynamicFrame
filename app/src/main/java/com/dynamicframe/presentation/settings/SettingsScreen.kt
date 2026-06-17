@@ -25,6 +25,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -37,7 +38,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dynamicframe.presentation.common.TvPickerChip
 import com.dynamicframe.presentation.common.TvPickerChipStyle
 import com.dynamicframe.domain.model.*
-import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.presentation.browser.FolderBrowserDialog
 import com.dynamicframe.presentation.browser.StoragePicker
 import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
@@ -237,19 +237,25 @@ fun SettingsScreen(
                 )
             }
             items(config.photoFolderUris, key = { "photo:$it" }) { uri ->
-                FolderChip(label = viewModel.folderLabel(uri), uri = uri, onRemove = {
-                    viewModel.removePhotoFolder(uri); onMediaChanged()
-                })
+                FolderChip(
+                    label = viewModel.folderLabel(uri), uri = uri,
+                    enabled = uri !in config.disabledPhotoFolderUris,
+                    onToggleEnabled = { viewModel.togglePhotoFolderEnabled(uri); onMediaChanged() },
+                    onRemove = { viewModel.removePhotoFolder(uri); onMediaChanged() }
+                )
             }
             item {
-                NostalgiaActionButton(
-                    text = if (device.isTv) "Usar galería del dispositivo" else "Galería del dispositivo",
-                    icon = Icons.Default.Collections,
-                    onClick = {
-                        val grant = { onMediaChanged() }
-                        if (requestMediaAccess != null) requestMediaAccess(grant) else grant()
-                    }
-                )
+                // Atenuado: opción de respaldo cuando no hay carpetas propias
+                Box(modifier = Modifier.alpha(0.55f)) {
+                    NostalgiaActionButton(
+                        text = if (device.isTv) "Usar galería del dispositivo" else "Galería del dispositivo",
+                        icon = Icons.Default.Collections,
+                        onClick = {
+                            val grant = { onMediaChanged() }
+                            if (requestMediaAccess != null) requestMediaAccess(grant) else grant()
+                        }
+                    )
+                }
             }
             if (albums.isNotEmpty() && !config.hasCustomMediaFolders()) {
                 item {
@@ -298,7 +304,7 @@ fun SettingsScreen(
             item {
                 SettingsSwitchItem(
                     title = "Fotos aleatorias",
-                    icon = Icons.Default.Photo,
+                    icon = Icons.Default.Shuffle,
                     checked = config.photoShuffle,
                     note = "Reproduce las fotos en orden aleatorio.",
                     onCheckedChange = viewModel::updatePhotoShuffle
@@ -323,14 +329,17 @@ fun SettingsScreen(
                 )
             }
             items(config.videoFolderUris, key = { "video:$it" }) { uri ->
-                FolderChip(label = viewModel.folderLabel(uri), uri = uri, onRemove = {
-                    viewModel.removeVideoFolder(uri); onMediaChanged()
-                })
+                FolderChip(
+                    label = viewModel.folderLabel(uri), uri = uri,
+                    enabled = uri !in config.disabledVideoFolderUris,
+                    onToggleEnabled = { viewModel.toggleVideoFolderEnabled(uri); onMediaChanged() },
+                    onRemove = { viewModel.removeVideoFolder(uri); onMediaChanged() }
+                )
             }
             item {
                 SettingsSwitchItem(
                     title = "Videos aleatorios",
-                    icon = Icons.Default.Videocam,
+                    icon = Icons.Default.Shuffle,
                     checked = config.videoShuffle,
                     note = "Reproduce los videos en orden aleatorio.",
                     onCheckedChange = viewModel::updateVideoShuffle
@@ -419,16 +428,30 @@ fun SettingsScreen(
                 SettingsSectionHeader("Música de fondo", Icons.Default.MusicNote)
             }
             item {
-                SettingsDropdownItem(
-                    title = "Fuente de música",
-                    icon = Icons.Default.LibraryMusic,
-                    currentValue = config.musicSourceType.displayName(),
-                    options = MusicSourceType.entries.map { it.displayName() },
-                    note = "De dónde proviene la música que suena durante el slideshow.",
-                    onSelect = { idx ->
-                        viewModel.updateConfig(config.copy(musicSourceType = MusicSourceType.entries[idx]))
-                    }
-                )
+                Text("Fuentes activas", fontWeight = FontWeight.Medium, fontSize = 14.sp,
+                    modifier = Modifier.padding(bottom = 4.dp))
+                Text("Puedes combinar varias fuentes a la vez.",
+                    fontSize = 11.sp, color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    modifier = Modifier.padding(bottom = 8.dp))
+                // Toggle por tipo de fuente (las implementadas)
+                listOf(MusicSourceType.DEVICE_LIBRARY, MusicSourceType.LOCAL_FOLDER).forEach { type ->
+                    SettingsSwitchItem(
+                        title = type.displayName(),
+                        icon = Icons.Default.LibraryMusic,
+                        checked = type in config.musicSourceTypes,
+                        onCheckedChange = { viewModel.toggleMusicSource(type) }
+                    )
+                }
+                // Placeholders futuras fuentes
+                listOf(MusicSourceType.THEME, MusicSourceType.SPOTIFY, MusicSourceType.YOUTUBE).forEach { type ->
+                    SettingsSwitchItem(
+                        title = "${type.displayName()} (próximamente)",
+                        icon = Icons.Default.LibraryMusic,
+                        checked = type in config.musicSourceTypes,
+                        note = "Disponible en una versión futura.",
+                        onCheckedChange = { }
+                    )
+                }
             }
             item {
                 SettingsSliderItem(
@@ -449,7 +472,7 @@ fun SettingsScreen(
                     onCheckedChange = viewModel::updateMusicShuffle
                 )
             }
-            if (config.musicSourceType == MusicSourceType.LOCAL_FOLDER) {
+            if (MusicSourceType.LOCAL_FOLDER in config.musicSourceTypes) {
                 item {
                     NostalgiaActionButton(
                         text = if (useInAppBrowser) "Añadir carpeta de música" else "Elegir carpeta de música",
@@ -458,11 +481,15 @@ fun SettingsScreen(
                     )
                 }
                 items(config.musicFolderUris, key = { "music:$it" }) { uri ->
-                    FolderChip(label = viewModel.folderLabel(uri), uri = uri,
-                        onRemove = { viewModel.removeMusicFolder(uri) })
+                    FolderChip(
+                        label = viewModel.folderLabel(uri), uri = uri,
+                        enabled = uri !in config.disabledMusicFolderUris,
+                        onToggleEnabled = { viewModel.toggleMusicFolderEnabled(uri) },
+                        onRemove = { viewModel.removeMusicFolder(uri) }
+                    )
                 }
             }
-            if (config.musicSourceType == MusicSourceType.THEME) {
+            if (MusicSourceType.THEME in config.musicSourceTypes) {
                 item {
                     SettingsDropdownItem(
                         title = "Tema / ambiente",
@@ -476,7 +503,7 @@ fun SettingsScreen(
                     )
                 }
             }
-            if (config.musicSourceType == MusicSourceType.SPOTIFY) {
+            if (MusicSourceType.SPOTIFY in config.musicSourceTypes) {
                 item {
                     SettingsTextFieldItem(
                         title = "URL playlist Spotify",
@@ -488,7 +515,7 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                 }
             }
-            if (config.musicSourceType == MusicSourceType.YOUTUBE) {
+            if (MusicSourceType.YOUTUBE in config.musicSourceTypes) {
                 item {
                     SettingsTextFieldItem(
                         title = "URL lista YouTube",
@@ -849,7 +876,12 @@ fun SettingsSliderItem(
         if (device.isTv) {
             val step = if (steps > 0) (valueRange.endInclusive - valueRange.start) / (steps + 1)
             else (valueRange.endInclusive - valueRange.start) / 10f
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            // focusGroup permite que el D-pad entre en este Row y navegue entre los dos botones
+            Row(
+                modifier = Modifier.focusGroup(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
                 TvStepperChip(icon = Icons.Default.Remove, desc = "Reducir",
                     onClick = { onValueChange((value - step).coerceIn(valueRange.start, valueRange.endInclusive)) })
                 Text(valueLabel, color = MaterialTheme.colorScheme.primary, fontWeight = FontWeight.Medium,
@@ -1015,66 +1047,87 @@ fun VideoMusicBehavior.displayName() = when (this) {
     VideoMusicBehavior.DUCK -> "Bajar volumen"
 }
 
+/**
+ * Chip de carpeta con toggle activar/desactivar y botón papelera navegable por separado.
+ * En TV ambos controles son accesibles con D-pad (focusGroup exterior).
+ */
 @Composable
-fun FolderChip(label: String, uri: String = "", onRemove: () -> Unit) {
+fun FolderChip(
+    label: String,
+    uri: String = "",
+    enabled: Boolean = true,
+    onToggleEnabled: (() -> Unit)? = null,
+    onRemove: () -> Unit
+) {
     val device = LocalDeviceProfile.current
     val displayPath = remember(uri) { uriToDisplayPath(uri) }
 
-    if (device.isTv) {
-        // En TV: fila completa focusable, OK = quitar carpeta
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp)
-                .safeClickable(onClick = onRemove),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+            .then(if (device.isTv) Modifier.focusGroup() else Modifier),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // ── Información de la carpeta ──────────────────────────────────────
+        Column(
+            Modifier
+                .weight(1f)
+                .padding(end = 8.dp)
+                .alpha(if (enabled) 1f else 0.45f)
         ) {
-            Row(
-                modifier = Modifier.weight(1f).padding(end = 8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Icon(Icons.Default.Delete, contentDescription = null,
-                    tint = MaterialTheme.colorScheme.error,
-                    modifier = Modifier.size(20.dp))
-                Column {
-                    Text(text = label, fontSize = 15.sp, maxLines = 1)
-                    if (displayPath.isNotBlank() && displayPath != label) {
-                        Text(text = displayPath, fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
-                            maxLines = 1)
-                    }
-                }
+            Text(text = label, fontSize = if (device.isTv) 15.sp else 14.sp, maxLines = 1)
+            if (displayPath.isNotBlank() && displayPath != label) {
+                Text(
+                    text = displayPath,
+                    fontSize = if (device.isTv) 11.sp else 10.sp,
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
             }
-            Text("Quitar (OK)", fontSize = 13.sp, color = MaterialTheme.colorScheme.error)
         }
-    } else {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Column(Modifier.weight(1f).padding(end = 8.dp)) {
-                Text(text = label, maxLines = 1)
-                if (displayPath.isNotBlank() && displayPath != label) {
-                    Text(text = displayPath, fontSize = 10.sp,
-                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.45f),
-                        maxLines = 2)
-                }
-            }
-            Row(
+
+        // ── Toggle activar/desactivar ───────────────────────────────────────
+        if (onToggleEnabled != null) {
+            Box(
                 modifier = Modifier
-                    .safeClickable(onClick = onRemove)
-                    .padding(horizontal = 12.dp, vertical = 10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    .size(if (device.isTv) 44.dp else 36.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(
+                        if (enabled) MaterialTheme.colorScheme.primary.copy(alpha = 0.12f)
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
+                    )
+                    .safeClickable(onClick = onToggleEnabled),
+                contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Delete, contentDescription = "Quitar carpeta",
-                    tint = MaterialTheme.colorScheme.error)
+                Icon(
+                    imageVector = if (enabled) Icons.Default.Visibility else Icons.Default.VisibilityOff,
+                    contentDescription = if (enabled) "Desactivar" else "Activar",
+                    tint = if (enabled) MaterialTheme.colorScheme.primary
+                    else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.4f),
+                    modifier = Modifier.size(if (device.isTv) 22.dp else 18.dp)
+                )
             }
+            Spacer(Modifier.width(6.dp))
+        }
+
+        // ── Botón eliminar (suelto, independiente) ─────────────────────────
+        Box(
+            modifier = Modifier
+                .size(if (device.isTv) 44.dp else 36.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(MaterialTheme.colorScheme.error.copy(alpha = 0.10f))
+                .safeClickable(onClick = onRemove),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Delete,
+                contentDescription = "Quitar carpeta",
+                tint = MaterialTheme.colorScheme.error,
+                modifier = Modifier.size(if (device.isTv) 22.dp else 18.dp)
+            )
         }
     }
 }

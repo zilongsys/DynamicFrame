@@ -96,9 +96,13 @@ data class SlideshowConfig(
     // Carpetas locales (SAF / file). Vacías = galería del dispositivo
     val photoFolderUris: List<String> = emptyList(),
     val videoFolderUris: List<String> = emptyList(),
+    /** URIs desactivadas temporalmente sin borrar */
+    val disabledPhotoFolderUris: Set<String> = emptySet(),
+    val disabledVideoFolderUris: Set<String> = emptySet(),
+    val disabledMusicFolderUris: Set<String> = emptySet(),
     val mediaContentFilter: MediaContentFilter = MediaContentFilter.ALL,
-    // Música de fondo
-    val musicSourceType: MusicSourceType = MusicSourceType.DEVICE_LIBRARY,
+    // Música de fondo — múltiples fuentes activas
+    val musicSourceTypes: Set<MusicSourceType> = setOf(MusicSourceType.DEVICE_LIBRARY),
     val musicFolderUris: List<String> = emptyList(),
     val musicTheme: MusicTheme = MusicTheme.RELAX,
     val spotifyPlaylistUrl: String = "",
@@ -127,7 +131,24 @@ data class SlideshowConfig(
     val playbackBackgroundType: PlaybackBackgroundType = PlaybackBackgroundType.DEMO_LAVENDER,
     /** URI de imagen personalizada para fondo (si type = CUSTOM_IMAGE) */
     val playbackBackgroundImageUri: String = ""
-)
+) {
+    /** Compatibilidad: primera fuente activa, o DEVICE_LIBRARY si no hay ninguna */
+    val musicSourceType: MusicSourceType
+        get() = musicSourceTypes.firstOrNull() ?: MusicSourceType.DEVICE_LIBRARY
+
+    /** Carpetas de fotos activas (excluye las desactivadas temporalmente) */
+    fun activePhotoFolderUris(): List<String> =
+        photoFolderUris.filter { it !in disabledPhotoFolderUris }
+
+    /** Carpetas de vídeos activas */
+    fun activeVideoFolderUris(): List<String> =
+        videoFolderUris.filter { it !in disabledVideoFolderUris }
+
+    /** Carpetas de música activas */
+    fun activeMusicFolderUris(): List<String> =
+        musicFolderUris.filter { it !in disabledMusicFolderUris }
+
+}
 
 /** Fondo visible en los márgenes cuando la foto no llena el marco */
 enum class PlaybackBackgroundType {

@@ -9,6 +9,10 @@ Para versiones publicadas ver `CHANGELOG.md`.
 - Estado: Completado (v0.1.38)
 - Descripción: Pantalla incompleta arriba corregida; botón duplicado eliminado; notas por control añadidas (foco en TV); secciones reorganizadas; música aleatoria reubicada.
 
+## 2026-06-17 — Foco roadmap profesional, toggle carpetas, papelera D-pad, shuffle icons, multi-fuente música, fix +/- volumen
+- Estado: Completado (v0.1.40)
+- Descripción: Rediseño foco hoja de ruta (barra lateral animada, sin salto). Toggle activar/desactivar carpetas. Botón papelera independiente y navegable. Iconos shuffle. Multi-select fuentes de música. Fix definitivo botones +/- de volumen con focusGroup.
+
 ## 2026-06-17 — Hoja de ruta scroll, filtro, foco; Preferencias FolderChip, ruta, reorg
 - Estado: Completado (v0.1.39)
 - Descripción: Scrollbar + filtro por estado en hoja de ruta; restauración de foco estilo Netflix; FolderChip con ruta completa y focusable en TV; Preferencias reorganizadas por tipo de contenido; versión al final.

@@ -1,7 +1,8 @@
 package com.dynamicframe.presentation.home
 
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.interaction.MutableInteractionSource
@@ -20,6 +21,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -177,7 +179,10 @@ private fun FeatureCatalogSection(
                     .fillMaxSize()
                     .padding(end = 14.dp)
                     .then(if (device.isTv) Modifier.focusGroup() else Modifier),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp),
+                // Padding extra arriba/abajo para que los ítems cercanos a los bordes
+                // no salten al recibir foco (el scroll tiene espacio de maniobra)
+                contentPadding = PaddingValues(vertical = 8.dp)
             ) {
                 items(filteredItems, key = { "${it.category}_${it.name}" }) { item ->
                     val emphasized = highlight != null &&
@@ -185,27 +190,43 @@ private fun FeatureCatalogSection(
                     val interactionSource = remember { MutableInteractionSource() }
                     val focused by interactionSource.collectIsFocusedAsState()
 
+                    val bgColor by animateColorAsState(
+                        targetValue = when {
+                            focused -> MemoriaPurpleSoft
+                            emphasized -> MemoriaPurpleSoft.copy(alpha = 0.45f)
+                            else -> MemoriaSurface
+                        },
+                        animationSpec = tween(durationMillis = 160),
+                        label = "roadmap-item-bg"
+                    )
+                    val accentAlpha by animateColorAsState(
+                        targetValue = if (focused || emphasized) MemoriaPurple else Color.Transparent,
+                        animationSpec = tween(durationMillis = 160),
+                        label = "roadmap-item-accent"
+                    )
+
                     Surface(
                         modifier = Modifier
                             .fillMaxWidth()
+                            // Barra izquierda de acento — se dibuja sin cambiar el layout
+                            .drawBehind {
+                                drawRect(
+                                    color = accentAlpha,
+                                    size = size.copy(width = 3.dp.toPx())
+                                )
+                            }
                             .then(
                                 if (device.isTv) Modifier.focusable(
                                     interactionSource = interactionSource
                                 ) else Modifier
                             ),
                         shape = RoundedCornerShape(12.dp),
-                        color = when {
-                            focused -> MemoriaPurpleSoft
-                            emphasized -> MemoriaPurpleSoft.copy(alpha = 0.6f)
-                            else -> MemoriaSurface
-                        },
-                        border = androidx.compose.foundation.BorderStroke(
-                            width = if (focused) 2.dp else 1.dp,
-                            color = if (focused) MemoriaPurple else MemoriaLine
-                        )
+                        color = bgColor,
+                        // Borde fino fijo (1dp siempre) — no cambia tamaño al enfocar
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MemoriaLine)
                     ) {
                         Row(
-                            modifier = Modifier.padding(14.dp),
+                            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(12.dp)
                         ) {

@@ -1,5 +1,20 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.40
+
+### Añadido
+- Hoja de ruta: foco profesional con barra lateral animada y fondo suave (sin salto al desplazar, borde fijo 1dp).
+- Preferencias: toggle activar/desactivar carpetas sin eliminarlas (icono ojo); al desactivar no se muestran fotos/videos/música.
+- Preferencias: botón papelera (🗑) independiente y navegable con D-pad en cada FolderChip.
+- Preferencias: icono 🔀 en todas las opciones de reproducción aleatoria.
+- Preferencias: fuente de música ahora es multi-select; se pueden combinar Biblioteca del dispositivo + Carpeta local.
+- `SlideshowConfig`: propiedades `disabledPhotoFolderUris`, `disabledVideoFolderUris`, `disabledMusicFolderUris`, `musicSourceTypes`.
+
+### Corregido
+- Botones +/- de volumen (TvStepperChip): la Row que los contiene ahora tiene `focusGroup()`, lo que permite navegar entre ellos con D-pad.
+- Galería del dispositivo atenuada visualmente para diferenciarla de las acciones principales.
+- `focusGroup` import limpio; eliminado import obsoleto `hasCustomMediaFolders` (ahora es método de `SlideshowConfig`).
+
 ## v0.1.39
 
 ### Añadido

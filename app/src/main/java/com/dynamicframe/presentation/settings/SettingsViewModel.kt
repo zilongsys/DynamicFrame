@@ -156,6 +156,26 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
+    fun togglePhotoFolderEnabled(uri: String) = updateConfigField { c ->
+        val disabled = c.disabledPhotoFolderUris
+        c.copy(disabledPhotoFolderUris = if (uri in disabled) disabled - uri else disabled + uri)
+    }
+
+    fun toggleVideoFolderEnabled(uri: String) = updateConfigField { c ->
+        val disabled = c.disabledVideoFolderUris
+        c.copy(disabledVideoFolderUris = if (uri in disabled) disabled - uri else disabled + uri)
+    }
+
+    fun toggleMusicFolderEnabled(uri: String) = updateConfigField { c ->
+        val disabled = c.disabledMusicFolderUris
+        c.copy(disabledMusicFolderUris = if (uri in disabled) disabled - uri else disabled + uri)
+    }
+
+    fun toggleMusicSource(type: com.dynamicframe.domain.model.MusicSourceType) = updateConfigField { c ->
+        val current = c.musicSourceTypes
+        c.copy(musicSourceTypes = if (type in current && current.size > 1) current - type else current + type)
+    }
+
     fun folderLabel(uri: String): String = getFolderDisplayName(uri)
 
     fun storageRoots() = listStorageRoots()

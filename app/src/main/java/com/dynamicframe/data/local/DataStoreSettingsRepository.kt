@@ -61,6 +61,10 @@ class DataStoreSettingsRepository @Inject constructor(
             prefs[Keys.VIDEO_FOLDERS] = config.videoFolderUris.joinToString("|")
             prefs[Keys.MEDIA_FOLDERS] = config.allMediaFolderUris().joinToString("|")
             prefs[Keys.MEDIA_CONTENT_FILTER] = config.mediaContentFilter.name
+            prefs[Keys.DISABLED_PHOTO_FOLDERS] = config.disabledPhotoFolderUris.joinToString("|")
+            prefs[Keys.DISABLED_VIDEO_FOLDERS] = config.disabledVideoFolderUris.joinToString("|")
+            prefs[Keys.DISABLED_MUSIC_FOLDERS] = config.disabledMusicFolderUris.joinToString("|")
+            prefs[Keys.MUSIC_SOURCES] = config.musicSourceTypes.joinToString("|") { it.name }
             prefs[Keys.MUSIC_SOURCE] = config.musicSourceType.name
             prefs[Keys.MUSIC_FOLDERS] = config.musicFolderUris.joinToString("|")
             prefs[Keys.MUSIC_FOLDER] = config.musicFolderUris.firstOrNull() ?: ""
@@ -148,7 +152,13 @@ class DataStoreSettingsRepository @Inject constructor(
         photoFolderUris = resolvePhotoFolders(this),
         videoFolderUris = resolveVideoFolders(this),
         mediaContentFilter = enumOrDefault(this[Keys.MEDIA_CONTENT_FILTER], MediaContentFilter.ALL),
-        musicSourceType = enumOrDefault(this[Keys.MUSIC_SOURCE], MusicSourceType.DEVICE_LIBRARY),
+        disabledPhotoFolderUris = splitSet(this[Keys.DISABLED_PHOTO_FOLDERS]),
+        disabledVideoFolderUris = splitSet(this[Keys.DISABLED_VIDEO_FOLDERS]),
+        disabledMusicFolderUris = splitSet(this[Keys.DISABLED_MUSIC_FOLDERS]),
+        musicSourceTypes = splitSet(this[Keys.MUSIC_SOURCES]).mapNotNull {
+            runCatching { MusicSourceType.valueOf(it) }.getOrNull()
+        }.toSet().ifEmpty { setOf(enumOrDefault(this[Keys.MUSIC_SOURCE], MusicSourceType.DEVICE_LIBRARY)) },
+        // musicSourceType is computed from musicSourceTypes
         musicFolderUris = resolveMusicFolders(this),
         musicTheme = enumOrDefault(this[Keys.MUSIC_THEME], MusicTheme.RELAX),
         spotifyPlaylistUrl = this[Keys.SPOTIFY_URL] ?: "",
@@ -173,6 +183,9 @@ class DataStoreSettingsRepository @Inject constructor(
 
     private fun splitList(raw: String?): List<String> =
         raw?.split("|")?.filter { it.isNotBlank() } ?: emptyList()
+
+    private fun splitSet(raw: String?): Set<String> =
+        raw?.split("|")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     private fun resolvePhotoFolders(prefs: Preferences): List<String> {
         val explicit = splitList(prefs[Keys.PHOTO_FOLDERS])

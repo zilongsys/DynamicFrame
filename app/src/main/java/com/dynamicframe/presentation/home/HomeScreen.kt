@@ -36,7 +36,6 @@ import com.dynamicframe.BuildConfig
 import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.SlideshowConfig
-import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.presentation.browser.FolderBrowserDialog
 import com.dynamicframe.presentation.browser.StoragePicker
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
@@ -964,7 +963,7 @@ private fun MusicPanel(
                 currentValue = config.musicSourceType.displayName(),
                 options = com.dynamicframe.domain.model.MusicSourceType.entries.map { it.displayName() },
                 onSelect = { idx ->
-                    onUpdateConfig(config.copy(musicSourceType = com.dynamicframe.domain.model.MusicSourceType.entries[idx]))
+                    onUpdateConfig(config.copy(musicSourceTypes = setOf(com.dynamicframe.domain.model.MusicSourceType.entries[idx])))
                 }
             )
         }
