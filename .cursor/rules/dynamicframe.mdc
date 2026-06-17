@@ -1,0 +1,16 @@
+---
+description: Reglas del proyecto DynamicFrame (guía canónica en AGENTS.md)
+alwaysApply: true
+---
+
+# DynamicFrame
+
+La **fuente única de verdad** es `AGENTS.md` en la raíz del repositorio.
+
+Antes de escribir o modificar código:
+
+1. Lee y aplica **todas** las reglas de `AGENTS.md`.
+2. No introduzcas librerías, capas ni patrones fuera de lo descrito allí sin preguntar al usuario.
+3. Respeta Clean Architecture (`domain` / `data` / `presentation`), Hilt, flavors `tv`+`mobile`, y el checklist de cierre de tarea de ese archivo.
+
+Para cambiar estas reglas, edita solo `AGENTS.md` (no dupliques contenido aquí).

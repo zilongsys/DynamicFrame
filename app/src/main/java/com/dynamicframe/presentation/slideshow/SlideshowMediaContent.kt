@@ -1,8 +1,8 @@
 package com.dynamicframe.presentation.slideshow
 
-import android.net.Uri
-import androidx.compose.animation.core.*
-import androidx.compose.foundation.background
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.Text
@@ -13,20 +13,14 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
-import kotlin.math.roundToInt
-import coil.compose.AsyncImage
-import coil.imageLoader
-import coil.request.CachePolicy
-import coil.request.ImageRequest
 import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.TransitionType
+import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
+import com.dynamicframe.ui.components.AppAsyncImage
 import com.dynamicframe.ui.theme.PlaybackLetterboxBackground
-import androidx.compose.animation.AnimatedContent
-import androidx.compose.animation.ExperimentalAnimationApi
-import androidx.compose.foundation.focusable
+import kotlin.math.roundToInt
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -40,13 +34,14 @@ fun SlideshowMediaViewport(
     isPlaying: Boolean,
     muteVideoAudio: Boolean,
     mediaVolume: Float,
+    videoPlayer: SlideshowVideoPlayerRepository,
     onVideoEnded: () -> Unit,
+    onPlaybackError: () -> Unit = onVideoEnded,
+    onPreloadImages: (List<String>, Int, Int) -> Unit = { _, _, _ -> },
     backgroundType: com.dynamicframe.domain.model.PlaybackBackgroundType = com.dynamicframe.domain.model.PlaybackBackgroundType.BLACK,
     backgroundImageUri: String = "",
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
-    val loader = context.imageLoader
     val decodeSize = rememberMaxDecodeSize()
 
     val effectiveTransition = if (
@@ -58,22 +53,13 @@ fun SlideshowMediaViewport(
     }
 
     LaunchedEffect(currentItem.id, nextItem?.id, currentIndex, playlistItems.size) {
-        val uris = linkedSetOf<Uri>()
+        val uris = linkedSetOf<String>()
         if (currentItem.type == MediaType.IMAGE) uris.add(currentItem.uri)
         nextItem?.takeIf { it.type == MediaType.IMAGE }?.uri?.let { uris.add(it) }
-        uris.forEach { uri ->
-            loader.enqueue(
-                ImageRequest.Builder(context)
-                    .data(uri)
-                    .size(decodeSize.first, decodeSize.second)
-                    .diskCachePolicy(CachePolicy.ENABLED)
-                    .memoryCachePolicy(CachePolicy.ENABLED)
-                    .build()
-            )
-        }
+        onPreloadImages(uris.toList(), decodeSize.first, decodeSize.second)
     }
 
-    var underlayUri by remember { mutableStateOf<Uri?>(null) }
+    var underlayUri by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier
@@ -89,7 +75,6 @@ fun SlideshowMediaViewport(
             SlideshowImageContent(
                 uri = uri,
                 transitionType = TransitionType.NONE,
-                kenBurnsEnabled = false,
                 modifier = Modifier.fillMaxSize()
             )
         }
@@ -110,14 +95,18 @@ fun SlideshowMediaViewport(
                     decodeWidth = decodeSize.first,
                     decodeHeight = decodeSize.second,
                     modifier = Modifier.fillMaxSize(),
-                    onDisplayed = { underlayUri = item.uri }
+                    onDisplayed = { underlayUri = item.uri },
+                    onLoadError = onPlaybackError
                 )
-                MediaType.VIDEO -> VideoPlayer(
-                    uri = item.uri.toString(),
+                MediaType.VIDEO -> SlideshowVideoPlayer(
+                    videoPlayer = videoPlayer,
+                    uri = item.uri,
                     isPlaying = isPlaying,
                     mediaVolume = mediaVolume,
                     muteAudio = muteVideoAudio,
-                    onVideoEnded = onVideoEnded
+                    onVideoEnded = onVideoEnded,
+                    onPlaybackError = onPlaybackError,
+                    modifier = Modifier.fillMaxSize()
                 )
             }
         }
@@ -135,46 +124,40 @@ private fun rememberMaxDecodeSize(): Pair<Int, Int> {
 
 @Composable
 fun SlideshowImageContent(
-    uri: Uri,
+    uri: String,
     transitionType: TransitionType,
     modifier: Modifier = Modifier,
-    kenBurnsEnabled: Boolean = true,
     decodeWidth: Int? = null,
     decodeHeight: Int? = null,
-    onDisplayed: (() -> Unit)? = null
+    onDisplayed: (() -> Unit)? = null,
+    onLoadError: (() -> Unit)? = null
 ) {
-    val context = LocalContext.current
     val size = rememberMaxDecodeSize()
     val targetWidth = decodeWidth ?: size.first
     val targetHeight = decodeHeight ?: size.second
-    val enableKenBurns = false // Sin zoom: la imagen se muestra completa sin recortar
-
-    val scale = 1f
 
     var loadFailed by remember(uri) { mutableStateOf(false) }
 
     Box(modifier) {
-        AsyncImage(
-            model = ImageRequest.Builder(context)
-                .data(uri)
-                .size(targetWidth, targetHeight)
-                .crossfade(450)
-                .diskCachePolicy(CachePolicy.ENABLED)
-                .memoryCachePolicy(CachePolicy.ENABLED)
-                .build(),
-            contentDescription = null,
+        AppAsyncImage(
+            uri = uri,
             contentScale = ContentScale.Fit,
+            decodeWidth = targetWidth,
+            decodeHeight = targetHeight,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
-                    scaleX = scale
-                    scaleY = scale
+                    scaleX = 1f
+                    scaleY = 1f
                 },
             onSuccess = {
                 loadFailed = false
                 onDisplayed?.invoke()
             },
-            onError = { loadFailed = true }
+            onError = {
+                loadFailed = true
+                onLoadError?.invoke()
+            }
         )
         if (loadFailed) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

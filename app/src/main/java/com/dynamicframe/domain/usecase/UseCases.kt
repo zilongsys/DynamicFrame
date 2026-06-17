@@ -1,11 +1,15 @@
 package com.dynamicframe.domain.usecase
 
 import com.dynamicframe.domain.model.*
+import com.dynamicframe.domain.repository.ImageCacheRepository
 import com.dynamicframe.domain.repository.MediaRepository
 import com.dynamicframe.domain.repository.MusicRepository
 import com.dynamicframe.domain.repository.SettingsRepository
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
+import javax.inject.Singleton
 
 class GetSlideshowItemsUseCase @Inject constructor(
     private val mediaRepository: MediaRepository,
@@ -118,4 +122,71 @@ class DeleteMediaItemUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(item: MediaItem): Result<Unit> =
         mediaRepository.deleteMediaItem(item)
+}
+
+class EvictMediaCacheUseCase @Inject constructor(
+    private val imageCacheRepository: ImageCacheRepository
+) {
+    operator fun invoke(uri: String) {
+        imageCacheRepository.evict(uri)
+    }
+}
+
+class PreloadSlideshowImagesUseCase @Inject constructor(
+    private val imageCacheRepository: ImageCacheRepository
+) {
+    operator fun invoke(uris: Iterable<String>, width: Int, height: Int) {
+        uris.forEach { uri -> imageCacheRepository.preload(uri, width, height) }
+    }
+}
+
+@Singleton
+class UpdateSlideshowConfigUseCase @Inject constructor(
+    private val getConfig: GetSlideshowConfigUseCase,
+    private val saveConfig: SaveSlideshowConfigUseCase
+) {
+    private val mutex = Mutex()
+
+    suspend operator fun invoke(transform: (SlideshowConfig) -> SlideshowConfig) {
+        mutex.withLock {
+            saveConfig(transform(getConfig()))
+        }
+    }
+}
+
+class UpdateSelectedAlbumsUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(albumIds: List<String>) =
+        settingsRepository.updateSelectedAlbums(albumIds)
+}
+
+class UpdateIntervalUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(seconds: Int) = settingsRepository.updateInterval(seconds)
+}
+
+class UpdateTransitionUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(type: TransitionType) = settingsRepository.updateTransition(type)
+}
+
+class UpdateMusicVolumeUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(volume: Float) = settingsRepository.updateMusicVolume(volume)
+}
+
+class ToggleShuffleUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(enabled: Boolean) = settingsRepository.toggleShuffle(enabled)
+}
+
+class ToggleClockUseCase @Inject constructor(
+    private val settingsRepository: SettingsRepository
+) {
+    suspend operator fun invoke(enabled: Boolean) = settingsRepository.toggleClock(enabled)
 }

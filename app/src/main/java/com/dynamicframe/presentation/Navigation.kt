@@ -8,6 +8,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dynamicframe.domain.model.hasCustomMediaFolders
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.LaunchedEffect
 import androidx.navigation.NavHostController
@@ -16,6 +18,8 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.dynamicframe.presentation.home.HomeScreen
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
+import com.dynamicframe.presentation.permissions.MediaPermissionState
+import com.dynamicframe.presentation.permissions.hasMissingMediaPermissions
 import com.dynamicframe.presentation.permissions.rememberMediaPermissions
 import com.dynamicframe.presentation.settings.SettingsScreen
 import com.dynamicframe.presentation.settings.SettingsViewModel
@@ -36,6 +40,16 @@ fun DynamicFrameNavHost(
     val activity = LocalContext.current as ComponentActivity
     val slideshowViewModel: SlideshowViewModel = hiltViewModel(activity)
     val settingsViewModel: SettingsViewModel = hiltViewModel(activity)
+    val settingsConfig by settingsViewModel.config.collectAsStateWithLifecycle()
+
+    var mediaPermissionDenied by remember { mutableStateOf(false) }
+    val permissions = rememberMediaPermissions { mediaPermissionDenied = true }
+
+    LaunchedEffect(settingsConfig.photoFolderUris, settingsConfig.videoFolderUris) {
+        if (!settingsConfig.hasCustomMediaFolders() && hasMissingMediaPermissions(activity)) {
+            mediaPermissionDenied = true
+        }
+    }
 
     var fullscreenNavLocked by remember { mutableStateOf(false) }
     LaunchedEffect(fullscreenNavLocked) {
@@ -63,6 +77,8 @@ fun DynamicFrameNavHost(
                 isTV = isTV,
                 slideshowViewModel = slideshowViewModel,
                 settingsViewModel = settingsViewModel,
+                mediaPermissionDenied = mediaPermissionDenied,
+                permissions = permissions,
                 onOpenFullscreen = { openFullscreen() }
             )
         }
@@ -71,16 +87,17 @@ fun DynamicFrameNavHost(
             SlideshowScreen(
                 viewModel = slideshowViewModel,
                 isTV = isTV,
+                showPermissionDenied = mediaPermissionDenied,
                 onOpenSettings = { navController.navigate(Screen.Settings.route) },
                 onBack = { navController.popBackStack() }
             )
         }
 
         composable(Screen.Settings.route) {
-            val permissions = rememberMediaPermissions()
             SettingsScreen(
                 viewModel = settingsViewModel,
                 onBack = { navController.popBackStack() },
+                showPermissionDenied = mediaPermissionDenied,
                 requestMediaAccess = { onGranted ->
                     permissions.requestFor(MediaPermissionKind.PHOTOS_VIDEOS, onGranted)
                 },

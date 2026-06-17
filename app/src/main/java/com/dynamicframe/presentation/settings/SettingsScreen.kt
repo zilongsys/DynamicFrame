@@ -5,10 +5,16 @@ import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.safeClickable
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -27,19 +33,18 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.dynamicframe.data.local.LocalStorageBrowser
+import com.dynamicframe.presentation.common.TvPickerChip
+import com.dynamicframe.presentation.common.TvPickerChipStyle
 import com.dynamicframe.domain.model.*
 import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.presentation.browser.FolderBrowserDialog
 import com.dynamicframe.presentation.browser.StoragePicker
+import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
 import com.dynamicframe.ui.theme.NostalgiaActionButton
 import com.dynamicframe.ui.theme.TvStepperChip
 import com.dynamicframe.ui.theme.PlaybackLetterboxBackground
 import com.dynamicframe.ui.theme.displayName as playbackBackgroundDisplayName
 import com.dynamicframe.ui.theme.AppVersionLabel
-import androidx.compose.foundation.border
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.draw.clip
 import com.dynamicframe.ui.theme.MemoriaLine
 import com.dynamicframe.ui.theme.MemoriaPurple
 
@@ -52,6 +57,7 @@ fun SettingsScreen(
     onBack: () -> Unit,
     embedded: Boolean = false,
     modifier: Modifier = Modifier,
+    showPermissionDenied: Boolean = false,
     requestMediaAccess: ((onGranted: () -> Unit) -> Unit)? = null,
     requestMusicAccess: ((onGranted: () -> Unit) -> Unit)? = null,
     onMediaChanged: () -> Unit = {}
@@ -125,7 +131,9 @@ fun SettingsScreen(
             viewModel.addPhotoFolder(uri)
             onMediaChanged()
             folderBrowserTarget = null
-        }
+        },
+        listRoots = viewModel::storageRoots,
+        listSubfolders = viewModel::storageSubfolders
     )
 
     FolderBrowserDialog(
@@ -136,7 +144,9 @@ fun SettingsScreen(
             viewModel.addVideoFolder(uri)
             onMediaChanged()
             folderBrowserTarget = null
-        }
+        },
+        listRoots = viewModel::storageRoots,
+        listSubfolders = viewModel::storageSubfolders
     )
 
     FolderBrowserDialog(
@@ -146,7 +156,9 @@ fun SettingsScreen(
         onSelectFolder = { uri ->
             viewModel.addMusicFolder(uri)
             folderBrowserTarget = null
-        }
+        },
+        listRoots = viewModel::storageRoots,
+        listSubfolders = viewModel::storageSubfolders
     )
 
     Scaffold(
@@ -198,6 +210,14 @@ fun SettingsScreen(
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                         fontSize = 12.sp,
                         modifier = Modifier.padding(bottom = 12.dp)
+                    )
+                }
+            }
+
+            if (showPermissionDenied) {
+                item {
+                    MediaPermissionDeniedBanner(
+                        message = "Activa el acceso a fotos, vídeos o música en los ajustes del sistema para elegir carpetas."
                     )
                 }
             }
@@ -413,10 +433,19 @@ fun SettingsScreen(
 
             item {
                 SettingsSwitchItem(
-                    title = "Mezclar aleatoriamente",
-                    icon = Icons.Default.Shuffle,
-                    checked = config.shuffle,
-                    onCheckedChange = { viewModel.toggleShuffle(it) }
+                    title = "Fotos aleatorias",
+                    icon = Icons.Default.Photo,
+                    checked = config.photoShuffle,
+                    onCheckedChange = viewModel::updatePhotoShuffle
+                )
+            }
+
+            item {
+                SettingsSwitchItem(
+                    title = "Videos aleatorios",
+                    icon = Icons.Default.Videocam,
+                    checked = config.videoShuffle,
+                    onCheckedChange = viewModel::updateVideoShuffle
                 )
             }
 
@@ -425,7 +454,7 @@ fun SettingsScreen(
                     title = "Reproducir en bucle",
                     icon = Icons.Default.Repeat,
                     checked = config.loop,
-                    onCheckedChange = { viewModel.updateConfig(config.copy(loop = it)) }
+                    onCheckedChange = viewModel::updateLoop
                 )
             }
 
@@ -462,7 +491,7 @@ fun SettingsScreen(
 
             items(config.photoFolderUris, key = { it }) { uri ->
                 FolderChip(
-                    label = folderLabel(uri),
+                    label = viewModel.folderLabel(uri),
                     onRemove = {
                         viewModel.removePhotoFolder(uri)
                         onMediaChanged()
@@ -488,7 +517,7 @@ fun SettingsScreen(
 
             items(config.videoFolderUris, key = { it }) { uri ->
                 FolderChip(
-                    label = folderLabel(uri),
+                    label = viewModel.folderLabel(uri),
                     onRemove = {
                         viewModel.removeVideoFolder(uri)
                         onMediaChanged()
@@ -605,7 +634,7 @@ fun SettingsScreen(
                 }
                 items(config.musicFolderUris, key = { it }) { uri ->
                     FolderChip(
-                        label = folderLabel(uri),
+                        label = viewModel.folderLabel(uri),
                         onRemove = { viewModel.removeMusicFolder(uri) }
                     )
                 }
@@ -662,7 +691,7 @@ fun SettingsScreen(
                     title = "Música aleatoria",
                     icon = Icons.Default.Shuffle,
                     checked = config.musicShuffle,
-                    onCheckedChange = { viewModel.updateConfig(config.copy(musicShuffle = it)) }
+                    onCheckedChange = viewModel::updateMusicShuffle
                 )
             }
 
@@ -955,55 +984,59 @@ fun SettingsDropdownItem(
     var expanded by remember { mutableStateOf(false) }
     val device = LocalDeviceProfile.current
 
-    fun cycleTvSelection() {
-        val idx = options.indexOf(currentValue).let { current ->
-            if (current < 0) 0 else (current + 1) % options.size
-        }
-        onSelect(idx)
-    }
-
-    Box {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .safeClickable {
-                    if (device.isTv) cycleTvSelection() else expanded = true
-                }
-                .padding(vertical = if (device.isTv) 14.dp else 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
+    if (device.isTv) {
+        TvPickerChip(
+            title = title,
+            icon = icon,
+            displayValue = currentValue,
+            currentValue = currentValue,
+            options = options,
+            onSelect = onSelect,
+            modifier = Modifier.fillMaxWidth(),
+            style = TvPickerChipStyle.Full
+        )
+    } else {
+        Box {
             Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .safeClickable { expanded = true }
+                    .padding(vertical = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Icon(
-                    icon,
-                    contentDescription = title,
-                    tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
-                    modifier = Modifier.size(if (device.isTv) 26.dp else 22.dp)
-                )
-                Text(text = title, fontSize = if (device.isTv) 16.sp else 14.sp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        icon,
+                        contentDescription = title,
+                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Text(text = title, fontSize = 14.sp)
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = currentValue,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontSize = 14.sp
+                    )
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                }
             }
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = currentValue,
-                    color = MaterialTheme.colorScheme.primary,
-                    fontSize = if (device.isTv) 15.sp else 14.sp
-                )
-                Icon(Icons.Default.ArrowDropDown, contentDescription = null)
-            }
-        }
 
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            options.forEachIndexed { index, option ->
-                DropdownMenuItem(
-                    text = { Text(option) },
-                    onClick = {
-                        onSelect(index)
-                        expanded = false
-                    }
-                )
+            DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+                options.forEachIndexed { index, option ->
+                    DropdownMenuItem(
+                        text = { Text(option) },
+                        onClick = {
+                            onSelect(index)
+                            expanded = false
+                        }
+                    )
+                }
             }
         }
     }
@@ -1033,6 +1066,31 @@ fun TransitionType.displayName() = when (this) {
     TransitionType.PARALLAX -> "Parallax"
     TransitionType.CUBE -> "Cubo"
     TransitionType.NONE -> "Sin transición"
+}
+
+/** Etiqueta corta para chips del panel álbum activo. */
+fun TransitionType.dashboardLabel(): String = when (this) {
+    TransitionType.CROSSFADE -> "Fundido"
+    TransitionType.FADE -> "Clásico"
+    TransitionType.DISSOLVE -> "Disol."
+    TransitionType.KEN_BURNS -> "Ken Burns"
+    TransitionType.BLUR_FADE -> "Zoom"
+    TransitionType.SLIDE_LEFT -> "← Izq."
+    TransitionType.SLIDE_RIGHT -> "→ Der."
+    TransitionType.SLIDE_UP -> "↑"
+    TransitionType.SLIDE_DOWN -> "↓"
+    TransitionType.ZOOM_IN -> "Zoom +"
+    TransitionType.ZOOM_OUT -> "Zoom -"
+    TransitionType.ROTATE -> "Girar"
+    TransitionType.FLIP_HORIZONTAL -> "Flip H"
+    TransitionType.FLIP_VERTICAL -> "Flip V"
+    TransitionType.WIPE_LEFT -> "Wipe ←"
+    TransitionType.WIPE_RIGHT -> "Wipe →"
+    TransitionType.DEPTH -> "3D"
+    TransitionType.STACK -> "Pila"
+    TransitionType.PARALLAX -> "Parallax"
+    TransitionType.CUBE -> "Cubo"
+    TransitionType.NONE -> "Ninguna"
 }
 
 fun ClockPosition.displayName() = when (this) {
@@ -1069,8 +1127,6 @@ fun VideoMusicBehavior.displayName() = when (this) {
     VideoMusicBehavior.PAUSE -> "Pausar música"
     VideoMusicBehavior.DUCK -> "Bajar volumen"
 }
-
-fun folderLabel(uriString: String): String = LocalStorageBrowser.folderDisplayName(uriString)
 
 @Composable
 fun FolderChip(label: String, onRemove: () -> Unit) {

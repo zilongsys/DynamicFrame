@@ -86,7 +86,7 @@ class LocalMediaRepository @Inject constructor(
                             id = bucketId,
                             name = bucketName,
                             source = MediaSource.LOCAL,
-                            coverUri = imageUri,
+                            coverUri = imageUri.toString(),
                             itemCount = 1
                         ),
                         1
@@ -134,7 +134,7 @@ class LocalMediaRepository @Inject constructor(
                             id = bucketId,
                             name = bucketName,
                             source = MediaSource.LOCAL,
-                            coverUri = videoUri,
+                            coverUri = videoUri.toString(),
                             itemCount = 1
                         ),
                         1
@@ -220,7 +220,7 @@ class LocalMediaRepository @Inject constructor(
                 items.add(
                     MediaItem(
                         id = "img_$id",
-                        uri = uri,
+                        uri = uri.toString(),
                         type = MediaType.IMAGE,
                         source = MediaSource.LOCAL,
                         name = cursor.getString(nameCol) ?: "",
@@ -278,7 +278,7 @@ class LocalMediaRepository @Inject constructor(
                 items.add(
                     MediaItem(
                         id = "vid_$id",
-                        uri = uri,
+                        uri = uri.toString(),
                         type = MediaType.VIDEO,
                         source = MediaSource.LOCAL,
                         name = cursor.getString(nameCol) ?: "",
@@ -302,19 +302,19 @@ class LocalMediaRepository @Inject constructor(
 
     override suspend fun deleteMediaItem(item: MediaItem): Result<Unit> = withContext(Dispatchers.IO) {
         runCatching {
-            val uri = item.uri
-            when (uri.scheme) {
+            val parsed = Uri.parse(item.uri)
+            when (parsed.scheme) {
                 "file" -> {
-                    val path = uri.path ?: throw IOException("Ruta inválida")
+                    val path = parsed.path ?: throw IOException("Ruta inválida")
                     val file = File(path)
                     if (!file.exists() || !file.delete()) {
                         throw IOException("No se pudo borrar el archivo")
                     }
                 }
                 "content" -> {
-                    val rows = contentResolver.delete(uri, null, null)
+                    val rows = contentResolver.delete(parsed, null, null)
                     if (rows > 0) return@runCatching
-                    val doc = DocumentFile.fromSingleUri(context, uri)
+                    val doc = DocumentFile.fromSingleUri(context, parsed)
                     if (doc != null && doc.delete()) return@runCatching
                     throw IOException("No se pudo borrar. Puede requerir permiso del sistema.")
                 }

@@ -9,6 +9,7 @@ import androidx.media3.session.SessionToken
 import com.dynamicframe.domain.model.MusicPlayerState
 import com.dynamicframe.domain.model.MusicTrack
 import com.dynamicframe.domain.model.VideoMusicBehavior
+import com.dynamicframe.domain.repository.MusicPlaybackRepository
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CompletableDeferred
@@ -23,14 +24,14 @@ import javax.inject.Singleton
 @Singleton
 class MusicPlayerController @Inject constructor(
     @ApplicationContext private val context: Context
-) {
+) : MusicPlaybackRepository {
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
     private val connectMutex = Mutex()
     private var connectionDeferred: CompletableDeferred<Unit>? = null
 
     private val _state = MutableStateFlow(MusicPlayerState())
-    val state: StateFlow<MusicPlayerState> = _state.asStateFlow()
+    override val state: StateFlow<MusicPlayerState> = _state.asStateFlow()
 
     private var currentPlaylist: List<MusicTrack> = emptyList()
     private var pendingPlaylist: Pair<List<MusicTrack>, Int>? = null
@@ -38,7 +39,7 @@ class MusicPlayerController @Inject constructor(
     private var wasPlayingBeforeVideo = false
 
     /** Espera a que el MediaController esté listo (connect es asíncrono). */
-    suspend fun ensureConnected() = connectMutex.withLock {
+    override suspend fun ensureConnected() = connectMutex.withLock {
         controller?.let { return }
         val deferred = connectionDeferred ?: CompletableDeferred<Unit>().also {
             connectionDeferred = it
@@ -76,7 +77,7 @@ class MusicPlayerController @Inject constructor(
         }, { it.run() })
     }
 
-    fun disconnect() {
+    override fun disconnect() {
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
@@ -87,17 +88,20 @@ class MusicPlayerController @Inject constructor(
         _state.value = MusicPlayerState()
     }
 
-    fun setPlaylist(tracks: List<MusicTrack>, startIndex: Int = 0) {
+    override fun setPlaylist(tracks: List<MusicTrack>, startIndex: Int, autoPlay: Boolean) {
         currentPlaylist = tracks
         if (controller == null) {
             pendingPlaylist = tracks to startIndex
-            _state.value = _state.value.copy(playlist = tracks)
+            pendingAutoPlay = autoPlay
+            _state.value = _state.value.copy(playlist = tracks, isPlaying = false)
             return
         }
-        applyPlaylist(tracks, startIndex)
+        applyPlaylist(tracks, startIndex, autoPlay)
     }
 
-    private fun applyPlaylist(tracks: List<MusicTrack>, startIndex: Int) {
+    private var pendingAutoPlay: Boolean = false
+
+    private fun applyPlaylist(tracks: List<MusicTrack>, startIndex: Int, autoPlay: Boolean) {
         val mediaItems = tracks.map { track ->
             MediaItem.Builder()
                 .setMediaId(track.id)
@@ -107,35 +111,37 @@ class MusicPlayerController @Inject constructor(
         controller?.apply {
             setMediaItems(mediaItems, startIndex, 0L)
             prepare()
-            play()
+            if (autoPlay) play() else pause()
         }
         _state.value = _state.value.copy(
             playlist = tracks,
-            isPlaying = controller?.isPlaying == true
+            isPlaying = autoPlay && controller?.isPlaying == true
         )
     }
 
     private fun flushPendingPlaylist() {
         pendingPlaylist?.let { (tracks, index) ->
+            val autoPlay = pendingAutoPlay
             pendingPlaylist = null
-            applyPlaylist(tracks, index)
+            pendingAutoPlay = false
+            applyPlaylist(tracks, index, autoPlay)
         }
     }
 
-    fun play() {
+    override fun play() {
         controller?.play()
         syncState()
     }
 
-    fun pause() {
+    override fun pause() {
         controller?.pause()
         _state.value = _state.value.copy(isPlaying = false)
     }
 
-    fun skipNext() = controller?.seekToNextMediaItem()
+    override fun skipNext() = controller?.seekToNextMediaItem()
     fun skipPrevious() = controller?.seekToPreviousMediaItem()
 
-    fun setVolume(volume: Float) {
+    override fun setVolume(volume: Float) {
         val v = volume.coerceIn(0f, 1f)
         controller?.volume = v
         _state.value = _state.value.copy(volume = v)
@@ -144,12 +150,12 @@ class MusicPlayerController @Inject constructor(
         }
     }
 
-    fun setShuffle(enabled: Boolean) {
+    override fun setShuffle(enabled: Boolean) {
         controller?.shuffleModeEnabled = enabled
         _state.value = _state.value.copy(isShuffle = enabled)
     }
 
-    fun onVideoStarted(behavior: VideoMusicBehavior, duckVolume: Float) {
+    override fun onVideoStarted(behavior: VideoMusicBehavior, duckVolume: Float) {
         if (_state.value.isDucked) return
         volumeBeforeVideo = controller?.volume ?: _state.value.volume
         wasPlayingBeforeVideo = controller?.isPlaying == true
@@ -160,7 +166,7 @@ class MusicPlayerController @Inject constructor(
         _state.value = _state.value.copy(isDucked = true)
     }
 
-    fun onPhotoShown(normalVolume: Float) {
+    override fun onPhotoShown(normalVolume: Float) {
         if (!_state.value.isDucked) return
         val restoreVolume = volumeBeforeVideo ?: normalVolume
         setVolume(restoreVolume)
@@ -194,6 +200,13 @@ class MusicPlayerController @Inject constructor(
                 currentTrack = currentPlaylist.getOrNull(idx),
                 currentIndex = idx
             )
+        }
+
+        override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
+            if (currentPlaylist.isNotEmpty()) {
+                controller?.seekToNextMediaItem()
+                syncState()
+            }
         }
     }
 }

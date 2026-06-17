@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "slideshow_settings")
+private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
+    name = SlideshowPreferencesKeys.DATASTORE_FILE
+)
 
 @Singleton
 class DataStoreSettingsRepository @Inject constructor(
@@ -25,49 +27,7 @@ class DataStoreSettingsRepository @Inject constructor(
     @Volatile
     private var cachedConfig: SlideshowConfig = SlideshowConfig()
 
-    private object Keys {
-        val INTERVAL = intPreferencesKey("interval_seconds")
-        val TRANSITION = stringPreferencesKey("transition_type")
-        val SHUFFLE = booleanPreferencesKey("shuffle")
-        val LOOP = booleanPreferencesKey("loop")
-        val SHOW_CLOCK = booleanPreferencesKey("show_clock")
-        val SHOW_DATE = booleanPreferencesKey("show_date")
-        val CLOCK_POSITION = stringPreferencesKey("clock_position")
-        val MUSIC_VOLUME = floatPreferencesKey("music_volume")
-        val MEDIA_VOLUME = floatPreferencesKey("media_volume")
-        val MUTE_VIDEO = booleanPreferencesKey("mute_video")
-        val VIDEO_PLAY_FULL = booleanPreferencesKey("video_play_full")
-        val BRIGHTNESS = floatPreferencesKey("brightness")
-        val SELECTED_ALBUMS = stringPreferencesKey("selected_album_ids")
-        val MUSIC_PLAYLIST = stringPreferencesKey("music_playlist_id")
-        val AUTO_START = booleanPreferencesKey("auto_start_boot")
-        val SCREENSAVER = booleanPreferencesKey("screensaver_mode")
-        val MEDIA_FOLDERS = stringPreferencesKey("media_folder_uris")
-        val PHOTO_FOLDERS = stringPreferencesKey("photo_folder_uris")
-        val VIDEO_FOLDERS = stringPreferencesKey("video_folder_uris")
-        val MEDIA_CONTENT_FILTER = stringPreferencesKey("media_content_filter")
-        val MUSIC_SOURCE = stringPreferencesKey("music_source_type")
-        val MUSIC_FOLDER = stringPreferencesKey("music_folder_uri")
-        val MUSIC_FOLDERS = stringPreferencesKey("music_folder_uris")
-        val MUSIC_THEME = stringPreferencesKey("music_theme")
-        val SPOTIFY_URL = stringPreferencesKey("spotify_playlist_url")
-        val YOUTUBE_URL = stringPreferencesKey("youtube_playlist_url")
-        val MUSIC_SHUFFLE = booleanPreferencesKey("music_shuffle")
-        val VIDEO_MUSIC_BEHAVIOR = stringPreferencesKey("video_music_behavior")
-        val DUCKED_VOLUME = floatPreferencesKey("ducked_music_volume")
-        val PLAYBACK_SHOW_CLOCK = booleanPreferencesKey("playback_show_clock")
-        val PLAYBACK_SHOW_OVERLAY = booleanPreferencesKey("playback_show_overlay")
-        val PLAYBACK_IMMERSIVE = booleanPreferencesKey("playback_immersive")
-        val TRANSITION_DURATION_MS = intPreferencesKey("transition_duration_ms")
-        val SHOW_SCREEN_BORDER = booleanPreferencesKey("show_screen_border")
-        val UI_SCALE = floatPreferencesKey("ui_scale")
-        val SHOW_PICTURE_FRAME = booleanPreferencesKey("show_picture_frame")
-        val PLAYBACK_SAFE_BORDER = booleanPreferencesKey("playback_safe_border")
-        val PLAYBACK_FRAME_SCALE = floatPreferencesKey("playback_frame_scale")
-        val PLAYBACK_CONTENT_ZOOM = floatPreferencesKey("playback_content_zoom")
-        val PLAYBACK_BACKGROUND = stringPreferencesKey("playback_background_type")
-        val PLAYBACK_BACKGROUND_IMAGE = stringPreferencesKey("playback_background_image_uri")
-    }
+    private val Keys get() = SlideshowPreferencesKeys
 
     override fun observeConfig(): Flow<SlideshowConfig> =
         context.dataStore.data
@@ -84,7 +44,9 @@ class DataStoreSettingsRepository @Inject constructor(
         context.dataStore.edit { prefs ->
             prefs[Keys.INTERVAL] = config.intervalSeconds
             prefs[Keys.TRANSITION] = config.transition.name
-            prefs[Keys.SHUFFLE] = config.shuffle
+            prefs[Keys.SHUFFLE] = config.photoShuffle && config.videoShuffle
+            prefs[Keys.PHOTO_SHUFFLE] = config.photoShuffle
+            prefs[Keys.VIDEO_SHUFFLE] = config.videoShuffle
             prefs[Keys.LOOP] = config.loop
             prefs[Keys.SHOW_CLOCK] = config.showClock
             prefs[Keys.SHOW_DATE] = config.showDate
@@ -141,7 +103,11 @@ class DataStoreSettingsRepository @Inject constructor(
     }
 
     override suspend fun toggleShuffle(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.SHUFFLE] = enabled }
+        context.dataStore.edit {
+            it[Keys.SHUFFLE] = enabled
+            it[Keys.PHOTO_SHUFFLE] = enabled
+            it[Keys.VIDEO_SHUFFLE] = enabled
+        }
     }
 
     override suspend fun toggleClock(enabled: Boolean) {
@@ -153,16 +119,22 @@ class DataStoreSettingsRepository @Inject constructor(
     }
 
     private fun syncBootPreference(autoStart: Boolean) {
-        context.getSharedPreferences("settings_cache", Context.MODE_PRIVATE)
+        context.getSharedPreferences(SettingsBootCache.PREFS_NAME, Context.MODE_PRIVATE)
             .edit()
-            .putBoolean("auto_start_boot", autoStart)
+            .putBoolean(SettingsBootCache.AUTO_START_BOOT, autoStart)
             .apply()
     }
 
-    private fun Preferences.toConfig() = SlideshowConfig(
+    private fun Preferences.toConfig(): SlideshowConfig {
+        val legacyShuffle = this[Keys.SHUFFLE] ?: true
+        val photoShuffle = this[Keys.PHOTO_SHUFFLE] ?: legacyShuffle
+        val videoShuffle = this[Keys.VIDEO_SHUFFLE] ?: legacyShuffle
+        return SlideshowConfig(
         intervalSeconds = this[Keys.INTERVAL] ?: 8,
         transition = enumOrDefault(this[Keys.TRANSITION], TransitionType.CROSSFADE),
-        shuffle = this[Keys.SHUFFLE] ?: true,
+        shuffle = photoShuffle && videoShuffle,
+        photoShuffle = photoShuffle,
+        videoShuffle = videoShuffle,
         loop = this[Keys.LOOP] ?: true,
         showClock = this[Keys.SHOW_CLOCK] ?: true,
         showDate = this[Keys.SHOW_DATE] ?: true,
@@ -200,6 +172,7 @@ class DataStoreSettingsRepository @Inject constructor(
         playbackBackgroundType = enumOrDefault(this[Keys.PLAYBACK_BACKGROUND], PlaybackBackgroundType.DEMO_LAVENDER),
         playbackBackgroundImageUri = this[Keys.PLAYBACK_BACKGROUND_IMAGE] ?: ""
     )
+    }
 
     private fun splitList(raw: String?): List<String> =
         raw?.split("|")?.filter { it.isNotBlank() } ?: emptyList()

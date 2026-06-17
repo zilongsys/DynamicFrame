@@ -175,7 +175,9 @@ fun GlassIconButton(
     label: String? = null,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    prominent: Boolean = false
+    prominent: Boolean = false,
+    hintDescription: String = contentDescription,
+    onFocusHint: ((String) -> Unit)? = null
 ) {
     val device = LocalDeviceProfile.current
     val interactionSource = remember { MutableInteractionSource() }
@@ -185,6 +187,7 @@ fun GlassIconButton(
     LaunchedEffect(focused) {
         if (focused && label != null) triggerLabel()
     }
+    FocusHintEffect(focused = focused, description = hintDescription, onHint = onFocusHint ?: {})
 
     val shape = RoundedCornerShape(16.dp)
     val bg = if (prominent) GlassWhiteStrong else GlassWhite
@@ -234,10 +237,13 @@ fun GlassCircleButton(
     icon: ImageVector,
     contentDescription: String,
     modifier: Modifier = Modifier,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    hintDescription: String = contentDescription,
+    onFocusHint: ((String) -> Unit)? = null
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
+    FocusHintEffect(focused = focused, description = hintDescription, onHint = onFocusHint ?: {})
     val device = LocalDeviceProfile.current
     Box(
         modifier = modifier

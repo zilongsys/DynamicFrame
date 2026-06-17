@@ -2,20 +2,25 @@ package com.dynamicframe.presentation.slideshow
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.dynamicframe.data.player.MusicPlayerController
 import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.domain.model.photoFolderPillId
 import com.dynamicframe.domain.model.videoFolderPillId
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.SlideshowConfig
-import com.dynamicframe.domain.repository.SettingsRepository
 import com.dynamicframe.domain.model.MediaItem
+import com.dynamicframe.domain.playback.SlideshowMusicCoordinator
+import com.dynamicframe.domain.slideshow.SlideshowEngine
+import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.usecase.DeleteMediaItemUseCase
+import com.dynamicframe.domain.usecase.EvictMediaCacheUseCase
+import com.dynamicframe.domain.usecase.GetFolderDisplayNameUseCase
 import com.dynamicframe.domain.usecase.GetLocalAlbumsUseCase
-import com.dynamicframe.domain.usecase.GetMusicTracksUseCase
-import com.dynamicframe.domain.usecase.GetSlideshowConfigUseCase
+import com.dynamicframe.domain.usecase.ObserveMusicPlaybackUseCase
+import com.dynamicframe.domain.usecase.PreloadSlideshowImagesUseCase
+import com.dynamicframe.domain.usecase.UpdateSelectedAlbumsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -26,12 +31,15 @@ data class AlbumPillOption(val id: String?, val label: String)
 @HiltViewModel
 class SlideshowViewModel @Inject constructor(
     private val slideshowEngine: SlideshowEngine,
-    private val musicController: MusicPlayerController,
-    private val getMusicTracks: GetMusicTracksUseCase,
-    private val getConfig: GetSlideshowConfigUseCase,
+    private val musicCoordinator: SlideshowMusicCoordinator,
+    observeMusicPlayback: ObserveMusicPlaybackUseCase,
     private val getLocalAlbums: GetLocalAlbumsUseCase,
     private val deleteMediaItem: DeleteMediaItemUseCase,
-    private val settingsRepository: SettingsRepository
+    private val evictMediaCache: EvictMediaCacheUseCase,
+    private val preloadSlideshowImages: PreloadSlideshowImagesUseCase,
+    private val updateSelectedAlbums: UpdateSelectedAlbumsUseCase,
+    private val getFolderDisplayName: GetFolderDisplayNameUseCase,
+    val slideshowVideoPlayer: SlideshowVideoPlayerRepository
 ) : ViewModel() {
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
@@ -42,8 +50,8 @@ class SlideshowViewModel @Inject constructor(
     val slideshowConfig = slideshowEngine.config
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SlideshowConfig())
 
-    val musicState = musicController.state
-        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), musicController.state.value)
+    val musicState = observeMusicPlayback()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), musicCoordinator.state.value)
 
     private val _storeAlbums = MutableStateFlow<List<MediaAlbum>>(emptyList())
 
@@ -73,11 +81,11 @@ class SlideshowViewModel @Inject constructor(
             ) { type, config -> type to config }
                 .collect { (type, config) ->
                     when (type) {
-                        MediaType.VIDEO -> musicController.onVideoStarted(
+                        MediaType.VIDEO -> musicCoordinator.onVideoStarted(
                             config.videoMusicBehavior,
                             config.duckedMusicVolume
                         )
-                        MediaType.IMAGE -> musicController.onPhotoShown(config.musicVolume)
+                        MediaType.IMAGE -> musicCoordinator.onPhotoShown(config.musicVolume)
                         null -> Unit
                     }
                 }
@@ -85,40 +93,51 @@ class SlideshowViewModel @Inject constructor(
 
         viewModelScope.launch {
             slideshowConfig
-                .map { musicConfigKey(it) }
+                .map { musicCoordinator.musicConfigKey(it.musicSourceType, it.musicFolderUris, it.musicShuffle) }
                 .distinctUntilChanged()
-                .collect { refreshMusicPlaylist(force = true) }
+                .collect { musicCoordinator.refreshPlaylist(force = true, playAfter = false) }
         }
     }
 
     fun selectAlbum(albumId: String?) {
         viewModelScope.launch {
-            settingsRepository.updateSelectedAlbums(
-                if (albumId == null) emptyList() else listOf(albumId)
-            )
+            updateSelectedAlbums(if (albumId == null) emptyList() else listOf(albumId))
         }
     }
 
-    fun startSlideshow() {
-        slideshowEngine.start()
-        viewModelScope.launch { refreshMusicPlaylist(playAfter = true) }
+    fun startSlideshow(freshSession: Boolean = false) {
+        if (freshSession) {
+            slideshowEngine.beginSession()
+        } else {
+            slideshowEngine.start()
+        }
+        viewModelScope.launch { musicCoordinator.startForSession(freshSession) }
     }
+
+    fun restartSlideshow() = startSlideshow(freshSession = true)
 
     fun pauseSlideshow() {
         slideshowEngine.pause()
-        musicController.pause()
+        musicCoordinator.pause()
     }
 
     fun nextSlide() = slideshowEngine.next()
     fun previousSlide() = slideshowEngine.previous()
     fun onVideoCompleted() = slideshowEngine.onVideoCompleted()
+    fun onPlaybackError() = slideshowEngine.onPlaybackError()
+
+    fun preloadImages(uris: List<String>, width: Int, height: Int) {
+        if (uris.isEmpty()) return
+        preloadSlideshowImages(uris, width, height)
+    }
+
     fun jumpToSlide(index: Int) = slideshowEngine.jumpTo(index)
 
     fun reloadMedia() {
         viewModelScope.launch { slideshowEngine.loadMedia() }
     }
 
-    fun setMusicVolume(volume: Float) = musicController.setVolume(volume)
+    fun setMusicVolume(volume: Float) = musicCoordinator.setVolume(volume)
 
     fun toggleMusicPlayback() {
         if (slideshowState.value.isPlaying) {
@@ -128,7 +147,7 @@ class SlideshowViewModel @Inject constructor(
         }
     }
 
-    fun skipNextTrack() = musicController.skipNext()
+    fun skipNextTrack() = musicCoordinator.skipNext()
 
     fun clearToast() {
         _toastMessage.value = null
@@ -136,10 +155,27 @@ class SlideshowViewModel @Inject constructor(
 
     fun deleteItem(item: MediaItem) {
         viewModelScope.launch {
+            val wasPlaying = slideshowState.value.isPlaying
+            slideshowEngine.pause()
+            slideshowEngine.releaseCurrentForDelete()
+            evictMediaCache(item.uri)
+            delay(300)
+
             deleteMediaItem(item)
-                .onSuccess { slideshowEngine.removeItem(item.id) }
+                .onSuccess {
+                    slideshowEngine.removeItem(item.id)
+                    if (wasPlaying && slideshowEngine.state.value.playlistItems.isNotEmpty()) {
+                        slideshowEngine.start()
+                        musicCoordinator.resumePlayback()
+                    }
+                }
                 .onFailure { e ->
                     _toastMessage.value = e.message ?: "No se pudo borrar el archivo"
+                    slideshowEngine.loadMedia()
+                    if (wasPlaying) {
+                        slideshowEngine.start()
+                        musicCoordinator.resumePlayback()
+                    }
                 }
         }
     }
@@ -149,42 +185,18 @@ class SlideshowViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        slideshowVideoPlayer.release()
         super.onCleared()
     }
-
-    private suspend fun refreshMusicPlaylist(force: Boolean = false, playAfter: Boolean = false) {
-        runCatching {
-            val config = getConfig()
-            val tracks = getMusicTracks().getOrDefault(emptyList())
-            if (tracks.isEmpty()) return@runCatching
-
-            val playlistStale = musicController.state.value.playlist.isEmpty() ||
-                musicController.state.value.playlist.map { it.id } != tracks.map { it.id }
-
-            if (!force && !playlistStale && !playAfter) {
-                musicController.setVolume(config.musicVolume)
-                return@runCatching
-            }
-
-            musicController.ensureConnected()
-            musicController.setPlaylist(tracks)
-            musicController.setVolume(config.musicVolume)
-            musicController.setShuffle(config.musicShuffle)
-            if (playAfter) musicController.play()
-        }
-    }
-
-    private fun musicConfigKey(config: SlideshowConfig): String =
-        "${config.musicSourceType}|${config.musicFolderUris}|${config.musicShuffle}"
 
     private fun buildAlbumPills(config: SlideshowConfig, albums: List<MediaAlbum>): List<AlbumPillOption> {
         val pills = mutableListOf(AlbumPillOption(null, "Todos"))
         if (config.hasCustomMediaFolders()) {
             config.photoFolderUris.distinct().forEach { uri ->
-                pills.add(AlbumPillOption(photoFolderPillId(uri), "Fotos: ${folderLabel(uri)}"))
+                pills.add(AlbumPillOption(photoFolderPillId(uri), "Fotos: ${getFolderDisplayName(uri)}"))
             }
             config.videoFolderUris.distinct().forEach { uri ->
-                pills.add(AlbumPillOption(videoFolderPillId(uri), "Videos: ${folderLabel(uri)}"))
+                pills.add(AlbumPillOption(videoFolderPillId(uri), "Videos: ${getFolderDisplayName(uri)}"))
             }
         } else {
             albums.forEach { album ->
@@ -193,7 +205,4 @@ class SlideshowViewModel @Inject constructor(
         }
         return pills
     }
-
-    private fun folderLabel(uriString: String): String =
-        com.dynamicframe.data.local.LocalStorageBrowser.folderDisplayName(uriString)
 }

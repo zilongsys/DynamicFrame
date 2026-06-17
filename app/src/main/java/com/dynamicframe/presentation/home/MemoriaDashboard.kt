@@ -1,36 +1,36 @@
 package com.dynamicframe.presentation.home
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
+import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusProperties
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.MusicPlayerState
 import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.SlideshowState
 import com.dynamicframe.domain.model.TransitionType
+import com.dynamicframe.presentation.common.TvPickerChip
+import com.dynamicframe.presentation.common.TvPickerChipStyle
 import com.dynamicframe.presentation.device.LocalDeviceProfile
-import com.dynamicframe.presentation.settings.SettingsDropdownItem
-import com.dynamicframe.presentation.settings.displayName
-import com.dynamicframe.presentation.slideshow.CenterPlayPauseButton
-import com.dynamicframe.presentation.slideshow.MediaCircleButton
+import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
+import com.dynamicframe.presentation.settings.dashboardLabel
 import com.dynamicframe.ui.theme.*
 
 @Composable
@@ -39,16 +39,16 @@ fun MemoriaDashboard(
     config: SlideshowConfig,
     musicState: MusicPlayerState,
     albumLabel: String,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
-    onPrev: () -> Unit,
+    showPermissionDenied: Boolean = false,
     onOpenFullscreen: () -> Unit,
     onIntervalChange: (Int) -> Unit,
     onTransitionChange: (TransitionType) -> Unit,
-    onShuffleChange: (Boolean) -> Unit,
+    onPhotoShuffleChange: (Boolean) -> Unit,
+    onVideoShuffleChange: (Boolean) -> Unit,
+    onMusicShuffleChange: (Boolean) -> Unit,
     onLoopChange: (Boolean) -> Unit,
     onVolumeChange: (Float) -> Unit,
-    onUpdateConfig: (SlideshowConfig) -> Unit
+    onShowDateChange: (Boolean) -> Unit
 ) {
     val items = slideshowState.playlistItems
     val photoCount = items.count { it.type == MediaType.IMAGE }
@@ -56,49 +56,37 @@ fun MemoriaDashboard(
     val totalDurationSec = estimateDurationSec(items, config.intervalSeconds, photoCount, videoCount)
     val trackCount = musicState.playlist.size
 
-    val device = LocalDeviceProfile.current
     Column(
         modifier = Modifier
             .fillMaxSize()
-            .then(if (device.isTv) Modifier.focusGroup() else Modifier)
+            .padding(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         MemoriaTopBar(
             albumLabel = albumLabel,
-            onFrameMode = onOpenFullscreen,
-            onPlay = onPlayPause,
-            isPlaying = slideshowState.isPlaying
+            onFrameMode = onOpenFullscreen
         )
-        Spacer(Modifier.height(10.dp))
 
-        BoxWithConstraints(
-            modifier = Modifier
-                .weight(1f)
-                .fillMaxWidth(),
-            contentAlignment = Alignment.Center
-        ) {
-            val side = minOf(maxWidth, maxHeight)
-            MemoriaSquarePreview(
-                slideshowState = slideshowState,
-                musicState = musicState,
-                config = config,
-                onPlayPause = onPlayPause,
-                onNext = onNext,
-                onPrev = onPrev,
-                modifier = Modifier.size(side)
+        if (showPermissionDenied) {
+            MediaPermissionDeniedBanner(
+                message = "Concede acceso a fotos y vídeos en Ajustes del sistema o elige carpetas en Configuración."
             )
         }
 
-        Spacer(Modifier.height(12.dp))
+        Spacer(Modifier.weight(1f))
+
         MemoriaControlsPanel(
             config = config,
             onIntervalChange = onIntervalChange,
             onTransitionChange = onTransitionChange,
-            onShuffleChange = onShuffleChange,
+            onPhotoShuffleChange = onPhotoShuffleChange,
+            onVideoShuffleChange = onVideoShuffleChange,
+            onMusicShuffleChange = onMusicShuffleChange,
             onLoopChange = onLoopChange,
             onVolumeChange = onVolumeChange,
-            onCaptionChange = { onUpdateConfig(config.copy(showDate = it)) }
+            onCaptionChange = onShowDateChange
         )
-        Spacer(Modifier.height(8.dp))
+
         MemoriaStatsFooter(
             photoCount = photoCount,
             videoCount = videoCount,
@@ -111,188 +99,58 @@ fun MemoriaDashboard(
 @Composable
 private fun MemoriaTopBar(
     albumLabel: String,
-    onFrameMode: () -> Unit,
-    onPlay: () -> Unit,
-    isPlaying: Boolean
+    onFrameMode: () -> Unit
 ) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
+    val frameFocus = remember { MutableInteractionSource() }
+    val frameFocused by frameFocus.collectIsFocusedAsState()
+    val (showHint, pulseHint) = rememberTransientVisibility(2_500L)
+
+    LaunchedEffect(frameFocused) {
+        if (frameFocused) pulseHint()
+    }
+
+    Column {
         Row(
-            modifier = Modifier.weight(1f).padding(end = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(Icons.Default.PhotoAlbum, null, tint = MemoriaMuted, modifier = Modifier.size(20.dp))
-            Text(
-                albumLabel,
-                color = MemoriaInk,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Medium,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-        Row(horizontalArrangement = Arrangement.spacedBy(14.dp), verticalAlignment = Alignment.CenterVertically) {
-            TopBarCircleAction(
-                icon = Icons.Default.CropSquare,
-                label = "Modo cuadro",
-                onClick = onFrameMode
-            )
-            TopBarCircleAction(
-                icon = if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
-                label = if (isPlaying) "Pausar" else "Play",
-                onClick = onPlay
-            )
-        }
-    }
-}
-
-@Composable
-private fun TopBarCircleAction(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit
-) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        MemoriaPlaybackCircleButton(
-            icon = icon,
-            contentDescription = label,
-            onClick = onClick,
-            size = 58.dp
-        )
-        Spacer(Modifier.height(4.dp))
-        Text(label, color = MemoriaMuted, fontSize = 11.sp, maxLines = 1)
-    }
-}
-
-@Composable
-private fun MemoriaSquarePreview(
-    slideshowState: SlideshowState,
-    musicState: MusicPlayerState,
-    config: SlideshowConfig,
-    onPlayPause: () -> Unit,
-    onNext: () -> Unit,
-    onPrev: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val item = slideshowState.currentItem
-    val total = slideshowState.totalItems
-    val index = if (total > 0) slideshowState.currentIndex + 1 else 0
-    val device = LocalDeviceProfile.current
-
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(16.dp))
-    ) {
-        PlaybackLetterboxBackground(
-            type = config.playbackBackgroundType,
-            customImageUri = config.playbackBackgroundImageUri,
-            modifier = Modifier.fillMaxSize()
-        )
-        if (item != null) {
-            AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(item.uri)
-                    .crossfade(300)
-                    .build(),
-                contentDescription = item.name,
-                modifier = Modifier.fillMaxSize(),
-                contentScale = ContentScale.Fit
-            )
-            if (item.type == MediaType.VIDEO) {
-                Box(
-                    Modifier
-                        .align(Alignment.TopEnd)
-                        .padding(10.dp)
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(Color.Black.copy(alpha = 0.55f))
-                        .padding(horizontal = 8.dp, vertical = 4.dp)
-                ) {
-                    Text("VIDEO", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.SemiBold)
-                }
-            }
-        } else {
-            Box(
-                Modifier
-                    .fillMaxSize()
-                    .background(MemoriaPreviewBg),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    slideshowState.error ?: "Sin medios",
-                    color = MemoriaMuted,
-                    fontSize = 14.sp
-                )
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
         ) {
             Row(
-                modifier = if (device.isTv) Modifier.focusGroup() else Modifier,
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                MediaCircleButton(
-                    icon = Icons.Default.SkipPrevious,
-                    contentDescription = "Anterior",
-                    onClick = onPrev,
-                    size = 50.dp
-                )
-                CenterPlayPauseButton(
-                    isPlaying = slideshowState.isPlaying,
-                    onClick = onPlayPause,
-                    buttonSize = 64.dp
-                )
-                MediaCircleButton(
-                    icon = Icons.Default.SkipNext,
-                    contentDescription = "Siguiente",
-                    onClick = onNext,
-                    size = 50.dp
-                )
-            }
-        }
-
-        if (total > 0) {
-            Text(
-                text = "$index / $total",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 12.sp,
                 modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .padding(12.dp)
-                    .clip(RoundedCornerShape(8.dp))
-                    .background(Color.Black.copy(alpha = 0.45f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp)
-            )
-        }
-
-        musicState.currentTrack?.let { track ->
-            Row(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
-                    .background(Color.Black.copy(alpha = 0.5f))
-                    .padding(horizontal = 12.dp, vertical = 8.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .weight(1f)
+                    .padding(end = 12.dp)
+                    .focusProperties { canFocus = false },
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                Icon(Icons.Default.MusicNote, null, tint = Color.White.copy(alpha = 0.7f), modifier = Modifier.size(14.dp))
-                Spacer(Modifier.width(6.dp))
+                Icon(Icons.Default.PhotoAlbum, null, tint = MemoriaMuted, modifier = Modifier.size(20.dp))
                 Text(
-                    "${track.title} — ${track.artist}",
-                    color = Color.White.copy(alpha = 0.9f),
-                    fontSize = 12.sp,
+                    albumLabel,
+                    color = MemoriaInk,
+                    fontSize = 15.sp,
+                    fontWeight = FontWeight.Medium,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            MemoriaPlaybackCircleButton(
+                icon = Icons.Default.TheaterComedy,
+                contentDescription = "Modo cuadro: pantalla completa con reproducción",
+                onClick = onFrameMode,
+                size = 58.dp,
+                interactionSource = frameFocus
+            )
+        }
+        if (showHint && frameFocused) {
+            Text(
+                "Modo cuadro: abre pantalla completa y reproduce fotos, vídeos y música",
+                color = MemoriaMuted,
+                fontSize = 11.sp,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                textAlign = TextAlign.End
+            )
         }
     }
 }
@@ -302,85 +160,369 @@ private fun MemoriaControlsPanel(
     config: SlideshowConfig,
     onIntervalChange: (Int) -> Unit,
     onTransitionChange: (TransitionType) -> Unit,
-    onShuffleChange: (Boolean) -> Unit,
+    onPhotoShuffleChange: (Boolean) -> Unit,
+    onVideoShuffleChange: (Boolean) -> Unit,
+    onMusicShuffleChange: (Boolean) -> Unit,
     onLoopChange: (Boolean) -> Unit,
     onVolumeChange: (Float) -> Unit,
     onCaptionChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val device = LocalDeviceProfile.current
+    val durationOptions = listOf(5, 8, 10, 15, 30, 60, 120)
+    val durationLabels = durationOptions.map { "${it}s" }
+    val currentDurationLabel = "${config.intervalSeconds}s"
+    val transitionLabels = TransitionType.entries.map { it.dashboardLabel() }
+    val currentTransitionLabel = config.transition.dashboardLabel()
+    val (hintText, setHint) = rememberControlHintState(
+        "Selecciona un control para ver su función"
+    )
+
     Surface(
         modifier = modifier.fillMaxWidth(),
         shape = RoundedCornerShape(14.dp),
         color = MemoriaSurface,
         border = androidx.compose.foundation.BorderStroke(1.dp, MemoriaLine)
     ) {
-        Column(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
-            val durationOptions = listOf(5, 8, 10, 15, 30, 60, 120)
+        Column(
+            modifier = Modifier.padding(horizontal = 12.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
             if (device.isTv) {
-                SettingsDropdownItem(
-                    title = "Duración por foto",
-                    icon = Icons.Default.Timer,
-                    currentValue = "${config.intervalSeconds} seg",
-                    options = durationOptions.map { "$it seg" },
-                    onSelect = { onIntervalChange(durationOptions[it.coerceIn(durationOptions.indices)]) }
-                )
-                Spacer(Modifier.height(4.dp))
-                SettingsDropdownItem(
-                    title = "Transición",
-                    icon = Icons.Default.AutoAwesome,
-                    currentValue = config.transition.displayName(),
-                    options = TransitionType.entries.map { it.displayName() },
-                    onSelect = { onTransitionChange(TransitionType.entries[it]) }
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    TvPickerChip(
+                        title = "Duración por foto",
+                        description = "Segundos que se muestra cada foto. OK: siguiente · Mantener OK: lista",
+                        icon = Icons.Default.Timer,
+                        displayValue = currentDurationLabel,
+                        currentValue = currentDurationLabel,
+                        options = durationLabels,
+                        onSelect = { onIntervalChange(durationOptions[it.coerceIn(durationOptions.indices)]) },
+                        onFocusHint = setHint,
+                        modifier = Modifier.weight(1f),
+                        style = TvPickerChipStyle.Compact
+                    )
+                    TvPickerChip(
+                        title = "Transición",
+                        description = "Efecto al cambiar de imagen. OK: siguiente · Mantener OK: lista",
+                        icon = Icons.Default.AutoAwesome,
+                        displayValue = currentTransitionLabel,
+                        currentValue = currentTransitionLabel,
+                        options = transitionLabels,
+                        onSelect = { onTransitionChange(TransitionType.entries[it]) },
+                        onFocusHint = setHint,
+                        modifier = Modifier.weight(1f),
+                        style = TvPickerChipStyle.Compact
+                    )
+                    MemoriaToggleChip(
+                        description = "Mostrar u ocultar leyenda con fecha en las fotos",
+                        label = "Leyenda",
+                        icon = Icons.Default.Subtitles,
+                        checked = config.showDate,
+                        onToggle = { onCaptionChange(!config.showDate) },
+                        onFocusHint = setHint,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MemoriaToggleChip(
+                        description = "Repetir el álbum al llegar al final",
+                        label = "Bucle",
+                        icon = Icons.Default.Repeat,
+                        checked = config.loop,
+                        onToggle = { onLoopChange(!config.loop) },
+                        onFocusHint = setHint,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    MemoriaShuffleToggleChip(
+                        description = "Orden aleatorio de las fotos del álbum",
+                        contentIcon = Icons.Default.Photo,
+                        checked = config.photoShuffle,
+                        onToggle = { onPhotoShuffleChange(!config.photoShuffle) },
+                        onFocusHint = setHint,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MemoriaShuffleToggleChip(
+                        description = "Orden aleatorio de los vídeos del álbum",
+                        contentIcon = Icons.Default.Videocam,
+                        checked = config.videoShuffle,
+                        onToggle = { onVideoShuffleChange(!config.videoShuffle) },
+                        onFocusHint = setHint,
+                        modifier = Modifier.weight(1f)
+                    )
+                    MemoriaShuffleToggleChip(
+                        description = "Orden aleatorio de la música de fondo",
+                        contentIcon = Icons.Default.MusicNote,
+                        checked = config.musicShuffle,
+                        onToggle = { onMusicShuffleChange(!config.musicShuffle) },
+                        onFocusHint = setHint,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                Box(
+                    modifier = Modifier.fillMaxWidth(),
+                    contentAlignment = Alignment.Center
+                ) {
+                    TvVolumeStepper(
+                        label = "Volumen música",
+                        icon = Icons.Default.VolumeUp,
+                        value = config.musicVolume,
+                        onValueChange = onVolumeChange,
+                        hintDescription = "Volumen de la música. ← → ajustar · OK: subir",
+                        onFocusHint = setHint,
+                        showLabel = false,
+                        showInlineIcon = true,
+                        modifier = Modifier
+                            .widthIn(min = 220.dp, max = 340.dp)
+                            .fillMaxWidth(0.6f)
+                    )
+                }
             } else {
                 Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     Column(Modifier.weight(1f)) {
-                        SettingsDropdownItem(
-                            title = "Duración por foto",
-                            icon = Icons.Default.Timer,
-                            currentValue = "${config.intervalSeconds} seg",
+                        MemoriaMobileDropdown(
+                            title = "Duración",
+                            value = "${config.intervalSeconds} seg",
                             options = durationOptions.map { "$it seg" },
-                            onSelect = { onIntervalChange(durationOptions[it.coerceIn(durationOptions.indices)]) }
+                            onSelect = { onIntervalChange(durationOptions[it]) }
                         )
                     }
                     Column(Modifier.weight(1f)) {
-                        SettingsDropdownItem(
+                        MemoriaMobileDropdown(
                             title = "Transición",
-                            icon = Icons.Default.AutoAwesome,
-                            currentValue = config.transition.displayName(),
-                            options = TransitionType.entries.map { it.displayName() },
+                            value = config.transition.dashboardLabel(),
+                            options = transitionLabels,
                             onSelect = { onTransitionChange(TransitionType.entries[it]) }
                         )
                     }
                 }
-            }
-            Spacer(Modifier.height(10.dp))
-            TvVolumeStepper(
-                label = "Volumen música",
-                icon = Icons.Default.VolumeUp,
-                value = config.musicVolume,
-                onValueChange = onVolumeChange
-            )
-            Spacer(Modifier.height(6.dp))
-            if (device.isTv) {
-                Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    TvSwitchRow("Orden aleatorio", Icons.Default.Shuffle, config.shuffle, onShuffleChange)
-                    TvSwitchRow("Mostrar leyenda", Icons.Default.Subtitles, config.showDate, onCaptionChange)
-                    TvSwitchRow("Bucle continuo", Icons.Default.Repeat, config.loop, onLoopChange)
-                }
-            } else {
                 Row(
-                    Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    TvSwitchRow("Orden aleatorio", Icons.Default.Shuffle, config.shuffle, onShuffleChange)
-                    TvSwitchRow("Mostrar leyenda", Icons.Default.Subtitles, config.showDate, onCaptionChange)
-                    TvSwitchRow("Bucle continuo", Icons.Default.Repeat, config.loop, onLoopChange)
+                    MemoriaToggleChip(
+                        description = "Mostrar leyenda",
+                        label = "Leyenda",
+                        icon = Icons.Default.Subtitles,
+                        checked = config.showDate,
+                        onToggle = { onCaptionChange(!config.showDate) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    MemoriaToggleChip(
+                        description = "Bucle continuo",
+                        label = "Bucle",
+                        icon = Icons.Default.Repeat,
+                        checked = config.loop,
+                        onToggle = { onLoopChange(!config.loop) },
+                        modifier = Modifier.weight(1f)
+                    )
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    MemoriaShuffleToggleChip(
+                        description = "Fotos aleatorias",
+                        contentIcon = Icons.Default.Photo,
+                        checked = config.photoShuffle,
+                        onToggle = { onPhotoShuffleChange(!config.photoShuffle) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    MemoriaShuffleToggleChip(
+                        description = "Videos aleatorios",
+                        contentIcon = Icons.Default.Videocam,
+                        checked = config.videoShuffle,
+                        onToggle = { onVideoShuffleChange(!config.videoShuffle) },
+                        modifier = Modifier.weight(1f)
+                    )
+                    MemoriaShuffleToggleChip(
+                        description = "Música aleatoria",
+                        contentIcon = Icons.Default.MusicNote,
+                        checked = config.musicShuffle,
+                        onToggle = { onMusicShuffleChange(!config.musicShuffle) },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                TvVolumeStepper(
+                    label = "Volumen música",
+                    icon = Icons.Default.VolumeUp,
+                    value = config.musicVolume,
+                    onValueChange = onVolumeChange,
+                    showInlineIcon = true
+                )
+            }
+            MemoriaControlsHintBar(text = hintText)
+        }
+    }
+}
+
+@Composable
+private fun MemoriaShuffleToggleChip(
+    description: String,
+    contentIcon: ImageVector,
+    checked: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocusHint: ((String) -> Unit)? = null
+) {
+    val shape = RoundedCornerShape(8.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+
+    FocusHintEffect(focused = focused, description = description, onHint = onFocusHint ?: {})
+
+    val borderColor = when {
+        focused -> MemoriaPurple
+        checked -> MemoriaPurple
+        else -> MemoriaLine.copy(alpha = 0.45f)
+    }
+    val bg = when {
+        focused -> MemoriaPurpleSoft
+        checked -> MemoriaPurpleSoft
+        else -> MemoriaSurface
+    }
+    val tint = if (checked || focused) MemoriaPurple else MemoriaMuted
+
+    Box(
+        modifier = modifier
+            .height(56.dp)
+            .clip(shape)
+            .background(bg, shape)
+            .border(2.dp, borderColor, shape)
+            .safeClickable(
+                interactionSource = interactionSource,
+                showFocusBorder = false,
+                focusShape = shape,
+                onClick = onToggle
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(4.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                contentIcon,
+                contentDescription = description,
+                tint = tint,
+                modifier = Modifier.size(28.dp)
+            )
+            Icon(
+                Icons.Outlined.Shuffle,
+                contentDescription = null,
+                tint = tint,
+                modifier = Modifier.size(24.dp)
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoriaToggleChip(
+    description: String,
+    label: String,
+    icon: ImageVector,
+    checked: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+    onFocusHint: ((String) -> Unit)? = null
+) {
+    val shape = RoundedCornerShape(8.dp)
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+
+    FocusHintEffect(focused = focused, description = description, onHint = onFocusHint ?: {})
+
+    val borderColor = when {
+        focused -> MemoriaPurple
+        checked -> MemoriaPurple
+        else -> MemoriaLine.copy(alpha = 0.45f)
+    }
+    val bg = when {
+        focused -> MemoriaPurpleSoft
+        checked -> MemoriaPurpleSoft
+        else -> MemoriaSurface
+    }
+    val tint = if (checked || focused) MemoriaPurple else MemoriaMuted
+
+    Box(
+        modifier = modifier
+            .height(52.dp)
+            .clip(shape)
+            .background(bg, shape)
+            .border(2.dp, borderColor, shape)
+            .safeClickable(
+                interactionSource = interactionSource,
+                showFocusBorder = false,
+                focusShape = shape,
+                onClick = onToggle
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(icon, contentDescription = description, tint = tint, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.height(2.dp))
+            Text(
+                label,
+                color = tint,
+                fontSize = 10.sp,
+                fontWeight = if (checked) FontWeight.SemiBold else FontWeight.Normal,
+                maxLines = 1,
+                textAlign = TextAlign.Center
+            )
+        }
+    }
+}
+
+@Composable
+private fun MemoriaMobileDropdown(
+    title: String,
+    value: String,
+    options: List<String>,
+    onSelect: (Int) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    Box {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(8.dp))
+                .background(MemoriaSurface)
+                .border(1.dp, MemoriaLine, RoundedCornerShape(8.dp))
+                .safeClickable { expanded = true }
+                .padding(horizontal = 10.dp, vertical = 12.dp),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(title, color = MemoriaMuted, fontSize = 11.sp)
+                Text(value, color = MemoriaInk, fontSize = 14.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            }
+            Icon(Icons.Default.ArrowDropDown, null, tint = MemoriaMuted)
+        }
+        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
+            options.forEachIndexed { index, option ->
+                DropdownMenuItem(
+                    text = { Text(option) },
+                    onClick = {
+                        onSelect(index)
+                        expanded = false
+                    }
+                )
             }
         }
     }
@@ -409,10 +551,10 @@ private fun MemoriaStatsFooter(
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            StatCell(photoCount.toString(), "fotos")
-            StatCell(videoCount.toString(), "videos")
-            StatCell("%d:%02d".format(min, sec), "duración")
-            StatCell(trackCount.toString(), "pistas")
+            StatCell(Icons.Default.Photo, photoCount.toString(), "Fotos")
+            StatCell(Icons.Default.Videocam, videoCount.toString(), "Videos")
+            StatCell(Icons.Default.Timer, "%d:%02d".format(min, sec), "Duración")
+            StatCell(Icons.Default.MusicNote, trackCount.toString(), "Pistas")
         }
         AppVersionLabel(
             modifier = Modifier
@@ -426,13 +568,23 @@ private fun MemoriaStatsFooter(
 }
 
 @Composable
-private fun StatCell(value: String, label: String) {
+private fun StatCell(
+    icon: ImageVector,
+    value: String,
+    contentDescription: String
+) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier.focusProperties { canFocus = false }
     ) {
-        Text(value, color = MemoriaInfoInk, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
-        Text(label, color = MemoriaMuted, fontSize = 10.sp, maxLines = 1)
+        Icon(
+            icon,
+            contentDescription = contentDescription,
+            tint = MemoriaMuted,
+            modifier = Modifier.size(15.dp)
+        )
+        Spacer(Modifier.height(2.dp))
+        Text(value, color = MemoriaInfoInk, fontSize = 13.sp, fontWeight = FontWeight.SemiBold, maxLines = 1)
     }
 }
 

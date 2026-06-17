@@ -33,7 +33,7 @@ class DocumentFolderScanner @Inject constructor(
             val root = DocumentFile.fromTreeUri(context, treeUri) ?: return@forEach
             scanMediaRecursive(root, filter, items, root.name ?: "Carpeta")
         }
-        return items.distinctBy { it.uri.toString() }
+        return items.distinctBy { it.uri }
             .sortedByDescending { it.dateAdded }
     }
 
@@ -45,7 +45,7 @@ class DocumentFolderScanner @Inject constructor(
         val root = DocumentFile.fromTreeUri(context, treeUri) ?: return emptyList()
         val tracks = mutableListOf<MusicTrack>()
         scanMusicRecursive(root, tracks)
-        return tracks.distinctBy { it.uri.toString() }.sortedBy { it.title.lowercase() }
+        return tracks.distinctBy { it.uri }.sortedBy { it.title.lowercase() }
     }
 
     private fun scanMediaRecursive(
@@ -68,11 +68,11 @@ class DocumentFolderScanner @Inject constructor(
         }
         if (!filter.allows(type)) return
 
-        val uri = file.uri
-        val name = file.name ?: queryDisplayName(uri) ?: "archivo"
+        val uri = file.uri.toString()
+        val name = file.name ?: queryDisplayName(file.uri) ?: "archivo"
         out.add(
             MediaItem(
-                id = "folder_${uri}",
+                id = "folder_$uri",
                 uri = uri,
                 type = type,
                 source = MediaSource.LOCAL,
@@ -92,12 +92,12 @@ class DocumentFolderScanner @Inject constructor(
         val mime = file.type ?: return
         if (!mime.startsWith("audio/")) return
 
-        val uri = file.uri
-        val name = file.name ?: queryDisplayName(uri) ?: "Sin título"
+        val uri = file.uri.toString()
+        val name = file.name ?: queryDisplayName(file.uri) ?: "Sin título"
         val title = name.substringBeforeLast('.')
         out.add(
             MusicTrack(
-                id = "folder_music_${uri}",
+                id = "folder_music_$uri",
                 uri = uri,
                 title = title,
                 artist = "Carpeta local",

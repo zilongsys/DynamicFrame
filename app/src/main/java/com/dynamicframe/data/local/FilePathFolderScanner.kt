@@ -34,7 +34,7 @@ class FilePathFolderScanner @Inject constructor() {
                 items.add(
                     MediaItem(
                         id = "path_${file.absolutePath}",
-                        uri = Uri.fromFile(file),
+                        uri = Uri.fromFile(file).toString(),
                         type = type,
                         source = MediaSource.LOCAL,
                         name = file.name,
@@ -45,7 +45,7 @@ class FilePathFolderScanner @Inject constructor() {
                 )
             }
 
-        return items.distinctBy { it.uri.toString() }.sortedByDescending { it.dateAdded }
+        return items.distinctBy { it.uri }.sortedByDescending { it.dateAdded }
     }
 
     fun scanMusicFolder(folderUri: String): List<MusicTrack> {
@@ -63,7 +63,7 @@ class FilePathFolderScanner @Inject constructor() {
                 tracks.add(
                     MusicTrack(
                         id = "path_music_${file.absolutePath}",
-                        uri = Uri.fromFile(file),
+                        uri = Uri.fromFile(file).toString(),
                         title = title,
                         artist = "Carpeta local",
                         duration = 0L
@@ -71,7 +71,7 @@ class FilePathFolderScanner @Inject constructor() {
                 )
             }
 
-        return tracks.distinctBy { it.uri.toString() }.sortedBy { it.title.lowercase() }
+        return tracks.distinctBy { it.uri }.sortedBy { it.title.lowercase() }
     }
 
     private fun mediaTypeFor(file: File): MediaType? = when (file.extension.lowercase()) {

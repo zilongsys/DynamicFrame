@@ -7,66 +7,78 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
-import java.util.concurrent.ConcurrentLinkedQueue
+import android.content.Context
+import android.content.pm.PackageManager
 
 enum class MediaPermissionKind { PHOTOS_VIDEOS, MUSIC, ALL }
 
 class MediaPermissionState internal constructor(
-    private val request: (Array<String>) -> Unit
+    private val requestLauncher: (Array<String>) -> Unit,
+    private val missingPermissions: (Array<String>) -> Array<String>,
+    private val defaultOnDenied: () -> Unit
 ) {
-    fun requestFor(kind: MediaPermissionKind, onGranted: () -> Unit = {}) {
+    private var pendingGranted: (() -> Unit)? = null
+    private var pendingDenied: (() -> Unit)? = null
+
+    fun requestFor(
+        kind: MediaPermissionKind,
+        onGranted: () -> Unit = {},
+        onDenied: () -> Unit = {}
+    ) {
         val perms = permissionsFor(kind)
         if (perms.isEmpty()) {
             onGranted()
             return
         }
-        pendingActions.add(onGranted)
-        request(perms)
+        val missing = missingPermissions(perms)
+        if (missing.isEmpty()) {
+            onGranted()
+            return
+        }
+        pendingGranted = onGranted
+        pendingDenied = onDenied
+        requestLauncher(missing)
     }
 
-    companion object {
-        private val pendingActions = ConcurrentLinkedQueue<() -> Unit>()
-
-        internal fun flushGranted() {
-            while (true) {
-                val action = pendingActions.poll() ?: break
-                action()
-            }
+    internal fun onResult(allGranted: Boolean) {
+        if (allGranted) {
+            pendingGranted?.invoke()
+        } else {
+            pendingDenied?.invoke() ?: defaultOnDenied()
         }
-
-        internal fun clearPending() {
-            pendingActions.clear()
-        }
+        pendingGranted = null
+        pendingDenied = null
     }
 }
 
 @Composable
-fun rememberMediaPermissions(): MediaPermissionState {
+fun rememberMediaPermissions(
+    onPermissionDenied: () -> Unit = {}
+): MediaPermissionState {
     val context = LocalContext.current
+    val deniedCallback = rememberUpdatedState(onPermissionDenied)
+    val stateHolder = remember { mutableStateOf<MediaPermissionState?>(null) }
+
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestMultiplePermissions()
     ) { results ->
-        val allGranted = results.values.all { it }
-        if (allGranted) {
-            MediaPermissionState.flushGranted()
-        } else {
-            MediaPermissionState.clearPending()
-        }
+        stateHolder.value?.onResult(results.values.all { it })
     }
 
-    return remember {
-        MediaPermissionState { perms ->
-            val missing = perms.filter {
-                ContextCompat.checkSelfPermission(context, it) !=
-                    android.content.pm.PackageManager.PERMISSION_GRANTED
-            }
-            if (missing.isEmpty()) {
-                MediaPermissionState.flushGranted()
-            } else {
-                launcher.launch(missing.toTypedArray())
-            }
-        }
+    val state = remember {
+        MediaPermissionState(
+            requestLauncher = { perms -> launcher.launch(perms) },
+            missingPermissions = { perms ->
+                perms.filter {
+                    ContextCompat.checkSelfPermission(context, it) !=
+                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                }.toTypedArray()
+            },
+            defaultOnDenied = { deniedCallback.value() }
+        ).also { stateHolder.value = it }
     }
+
+    return state
 }
 
 private fun permissionsFor(kind: MediaPermissionKind): Array<String> {
@@ -86,3 +98,15 @@ private fun permissionsFor(kind: MediaPermissionKind): Array<String> {
         else -> arrayOf(Manifest.permission.READ_EXTERNAL_STORAGE)
     }
 }
+
+fun missingMediaPermissions(context: Context, kind: MediaPermissionKind): Array<String> {
+    return permissionsFor(kind).filter {
+        ContextCompat.checkSelfPermission(context, it) != PackageManager.PERMISSION_GRANTED
+    }.toTypedArray()
+}
+
+fun hasMissingMediaPermissions(context: Context): Boolean =
+    missingMediaPermissions(context, MediaPermissionKind.PHOTOS_VIDEOS).isNotEmpty()
+
+fun hasMissingMusicPermissions(context: Context): Boolean =
+    missingMediaPermissions(context, MediaPermissionKind.MUSIC).isNotEmpty()

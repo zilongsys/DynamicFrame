@@ -1,11 +1,8 @@
 package com.dynamicframe.presentation.slideshow
 
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
-import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -15,20 +12,17 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.MediaItem as ExoMediaItem
-import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
-import com.dynamicframe.domain.model.ClockPosition
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.device.LocalDeviceProfile
+import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
 import com.dynamicframe.ui.theme.*
 import com.dynamicframe.ui.theme.requestFocusWhenReady
 import com.dynamicframe.ui.theme.tvFocusRequester
@@ -41,7 +35,8 @@ fun SlideshowScreen(
     viewModel: SlideshowViewModel = hiltViewModel(),
     onOpenSettings: () -> Unit,
     onBack: (() -> Unit)? = null,
-    isTV: Boolean = false
+    isTV: Boolean = false,
+    showPermissionDenied: Boolean = false
 ) {
     val slideshowState by viewModel.slideshowState.collectAsStateWithLifecycle()
     val config by viewModel.slideshowConfig.collectAsStateWithLifecycle()
@@ -51,6 +46,17 @@ fun SlideshowScreen(
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var resumeAfterDeleteDismiss by remember { mutableStateOf(false) }
+    val (controlHint, setControlHint) = rememberControlHintState(
+        if (isTV) "Abajo/OK: controles · Atrás: salir" else "Toca la pantalla para ver controles"
+    )
+
+    DisposableEffect(Unit) {
+        viewModel.startSlideshow(freshSession = true)
+        onDispose {
+            viewModel.pauseSlideshow()
+        }
+    }
 
     LaunchedEffect(toastMessage) {
         toastMessage?.let {
@@ -63,8 +69,18 @@ fun SlideshowScreen(
         visible = showDeleteConfirm,
         title = "¿Borrar esta foto o vídeo?",
         message = "Se eliminará del dispositivo. Esta acción no se puede deshacer.",
-        onConfirm = { viewModel.deleteCurrentSlide() },
-        onDismiss = { showDeleteConfirm = false }
+        onConfirm = {
+            resumeAfterDeleteDismiss = false
+            showDeleteConfirm = false
+            viewModel.deleteCurrentSlide()
+        },
+        onDismiss = {
+            showDeleteConfirm = false
+            if (resumeAfterDeleteDismiss) {
+                viewModel.startSlideshow()
+            }
+            resumeAfterDeleteDismiss = false
+        }
     )
 
     var showControls by remember { mutableStateOf(false) }
@@ -106,6 +122,7 @@ fun SlideshowScreen(
 
     val screenFocus = remember { FocusRequester() }
     val pauseFocus = remember { FocusRequester() }
+    val bottomBarFocus = remember { FocusRequester() }
     val backgroundCapturesFocus = isTV && !showControls
     var backNavigationEnabled by remember { mutableStateOf(!isTV) }
 
@@ -144,6 +161,7 @@ fun SlideshowScreen(
                 when {
                     backgroundCapturesFocus -> Modifier
                         .tvFocusRequester(screenFocus)
+                        .tvRevealOnDpad(enabled = true, onReveal = { revealControls() })
                         .safeClickable(showFocusBorder = false, onClick = { revealControls() })
                     !isTV -> Modifier
                         .safeClickable(showFocusBorder = false, onClick = { revealControls() })
@@ -179,7 +197,10 @@ fun SlideshowScreen(
                             isPlaying = slideshowState.isPlaying,
                             muteVideoAudio = config.muteVideoAudio,
                             mediaVolume = config.mediaVolume,
+                            videoPlayer = viewModel.slideshowVideoPlayer,
                             onVideoEnded = { viewModel.onVideoCompleted() },
+                            onPlaybackError = { viewModel.onPlaybackError() },
+                            onPreloadImages = viewModel::preloadImages,
                             backgroundType = config.playbackBackgroundType,
                             backgroundImageUri = config.playbackBackgroundImageUri,
                             modifier = Modifier.fillMaxSize()
@@ -194,11 +215,18 @@ fun SlideshowScreen(
                     .background(Color.Black),
                 contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = slideshowState.error ?: "Preparando fotos…",
-                    color = GlassText.copy(alpha = 0.7f),
-                    fontSize = 18.sp
-                )
+                if (showPermissionDenied) {
+                    MediaPermissionDeniedBanner(
+                        message = "Concede acceso a fotos y vídeos en Ajustes del sistema para reproducir el slideshow.",
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
+                } else {
+                    Text(
+                        text = slideshowState.error ?: "Preparando fotos…",
+                        color = GlassText.copy(alpha = 0.7f),
+                        fontSize = 18.sp
+                    )
+                }
             }
         }
         }
@@ -210,13 +238,14 @@ fun SlideshowScreen(
         AnimatedVisibility(
             visible = showClock,
             enter = fadeIn(androidx.compose.animation.core.tween(400)),
-            exit = fadeOut(androidx.compose.animation.core.tween(400))
+            exit = fadeOut(androidx.compose.animation.core.tween(400)),
+            modifier = Modifier
+                .align(Alignment.TopCenter)
+                .padding(top = 16.dp)
         ) {
-            GlassClockOverlay(
+            FrameModeClockTop(
                 time = currentTime,
-                date = if (config.showDate) currentDate else null,
-                position = config.clockPosition,
-                modifier = Modifier.fillMaxSize()
+                date = if (config.showDate) currentDate else null
             )
         }
 
@@ -225,16 +254,17 @@ fun SlideshowScreen(
             enter = fadeIn(androidx.compose.animation.core.tween(280)),
             exit = fadeOut(androidx.compose.animation.core.tween(240))
         ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .then(if (isTV) Modifier.focusGroup() else Modifier)
-            ) {
+            Box(modifier = Modifier.fillMaxSize()) {
                 Row(
                     modifier = Modifier
                         .align(Alignment.TopCenter)
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                        .padding(
+                            start = 20.dp,
+                            end = 20.dp,
+                            top = if (showClock) 88.dp else 16.dp,
+                            bottom = 16.dp
+                        ),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
@@ -255,6 +285,8 @@ fun SlideshowScreen(
                                 icon = Icons.Default.ArrowBack,
                                 contentDescription = "Volver",
                                 label = if (device.isTv) "Inicio" else "Volver",
+                                hintDescription = "Volver al panel principal",
+                                onFocusHint = setControlHint,
                                 onClick = {
                                     onBack()
                                 }
@@ -265,7 +297,11 @@ fun SlideshowScreen(
                                 icon = Icons.Default.DeleteOutline,
                                 contentDescription = "Borrar",
                                 label = if (device.isTv) "Borrar" else null,
+                                hintDescription = "Borrar la foto o vídeo actual",
+                                onFocusHint = setControlHint,
                                 onClick = {
+                                    resumeAfterDeleteDismiss = slideshowState.isPlaying
+                                    viewModel.pauseSlideshow()
                                     showDeleteConfirm = true
                                 }
                             )
@@ -274,6 +310,8 @@ fun SlideshowScreen(
                             icon = Icons.Default.Settings,
                             contentDescription = "Configuración",
                             label = if (device.isTv) "Configuración" else "Ajustes",
+                            hintDescription = "Abrir ajustes de la app",
+                            onFocusHint = setControlHint,
                             onClick = {
                                 onOpenSettings()
                             },
@@ -282,7 +320,13 @@ fun SlideshowScreen(
                     }
                 }
 
-                val pauseModifier = if (isTV) Modifier.tvFocusRequester(pauseFocus) else Modifier
+                val pauseModifier = if (isTV) {
+                    Modifier
+                        .tvFocusRequester(pauseFocus)
+                        .focusProperties { down = bottomBarFocus }
+                } else {
+                    Modifier
+                }
                 CenterPlayPauseButton(
                     isPlaying = slideshowState.isPlaying,
                     onClick = {
@@ -293,7 +337,9 @@ fun SlideshowScreen(
                     onFocusChanged = { focused ->
                         pauseHasFocus = focused
                         if (focused) pulseActionHint()
-                    }
+                    },
+                    hintDescription = if (slideshowState.isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
+                    onFocusHint = setControlHint
                 )
 
                 if (showOverlay) {
@@ -311,7 +357,6 @@ fun SlideshowScreen(
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .then(if (isTV) Modifier.focusGroup() else Modifier)
                     ) {
                         if (config.playbackShowOverlay && albumPills.size > 1) {
                             Text(
@@ -359,8 +404,20 @@ fun SlideshowScreen(
                         ) {
                             Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                                 GlassCircleButton(
+                                    icon = Icons.Default.Replay,
+                                    contentDescription = "Reiniciar reproducción",
+                                    hintDescription = "Reiniciar desde el principio (aplica aleatorio si está activo)",
+                                    onFocusHint = setControlHint,
+                                    onClick = {
+                                        viewModel.restartSlideshow()
+                                    }
+                                )
+                                GlassCircleButton(
                                     icon = Icons.Default.SkipPrevious,
                                     contentDescription = "Anterior",
+                                    hintDescription = "Foto o vídeo anterior",
+                                    onFocusHint = setControlHint,
+                                    modifier = if (isTV) Modifier.focusRequester(bottomBarFocus) else Modifier,
                                     onClick = {
                                         viewModel.previousSlide()
                                     }
@@ -368,6 +425,8 @@ fun SlideshowScreen(
                                 GlassCircleButton(
                                     icon = Icons.Default.SkipNext,
                                     contentDescription = "Siguiente",
+                                    hintDescription = "Foto o vídeo siguiente",
+                                    onFocusHint = setControlHint,
                                     onClick = {
                                         viewModel.nextSlide()
                                     }
@@ -380,29 +439,16 @@ fun SlideshowScreen(
                                 modifier = Modifier.weight(1f).padding(start = 12.dp)
                             ) {
                                 if (isTV) {
-                                    GlassCircleButton(
-                                        icon = Icons.Default.VolumeDown,
-                                        contentDescription = "Bajar volumen",
-                                        onClick = {
-                                            viewModel.setMusicVolume(
-                                                (musicState.volume - 0.1f).coerceIn(0f, 1f)
-                                            )
-                                        }
-                                    )
-                                    Text(
-                                        text = "${(musicState.volume * 100).toInt()}%",
-                                        color = GlassTextMuted,
-                                        fontSize = 12.sp,
-                                        modifier = Modifier.padding(horizontal = 4.dp)
-                                    )
-                                    GlassCircleButton(
+                                    TvVolumeStepper(
+                                        label = "Volumen",
                                         icon = Icons.Default.VolumeUp,
-                                        contentDescription = "Subir volumen",
-                                        onClick = {
-                                            viewModel.setMusicVolume(
-                                                (musicState.volume + 0.1f).coerceIn(0f, 1f)
-                                            )
-                                        }
+                                        value = musicState.volume,
+                                        onValueChange = viewModel::setMusicVolume,
+                                        showLabel = false,
+                                        horizontalKeysAdjustVolume = false,
+                                        hintDescription = "Volumen música. ↑ ↓ ajustar · ← → cambiar botón",
+                                        onFocusHint = setControlHint,
+                                        modifier = Modifier.weight(1f)
                                     )
                                 } else {
                                     Icon(
@@ -427,6 +473,8 @@ fun SlideshowScreen(
                                 GlassCircleButton(
                                     icon = if (musicState.isPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
                                     contentDescription = "Música",
+                                    hintDescription = if (musicState.isPlaying) "Pausar música" else "Reanudar música",
+                                    onFocusHint = setControlHint,
                                     onClick = {
                                         viewModel.toggleMusicPlayback()
                                     }
@@ -434,11 +482,26 @@ fun SlideshowScreen(
                                 GlassCircleButton(
                                     icon = Icons.Default.FastForward,
                                     contentDescription = "Siguiente canción",
+                                    hintDescription = "Saltar a la siguiente pista",
+                                    onFocusHint = setControlHint,
                                     onClick = {
                                         viewModel.skipNextTrack()
                                     }
                                 )
                             }
+                        }
+                        if (isTV) {
+                            Spacer(Modifier.height(8.dp))
+                            Text(
+                                text = controlHint,
+                                color = GlassTextMuted,
+                                fontSize = 11.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .focusable(enabled = false),
+                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                                maxLines = 2
+                            )
                         }
                     }
                 }
@@ -454,7 +517,7 @@ fun SlideshowScreen(
                     .padding(bottom = 20.dp)
             ) {
                 Text(
-                    text = if (isTV) "OK: pausar · Atrás: salir" else "Toca: controles",
+                    text = if (isTV) "Abajo/OK: controles · Atrás: salir" else "Toca: controles",
                     color = Color.White.copy(alpha = 0.45f),
                     fontSize = 12.sp
                 )
@@ -465,40 +528,23 @@ fun SlideshowScreen(
 }
 
 @Composable
-private fun GlassClockOverlay(
+private fun FrameModeClockTop(
     time: String,
-    date: String?,
-    position: ClockPosition,
-    modifier: Modifier = Modifier
+    date: String?
 ) {
-    val alignment = when (position) {
-        ClockPosition.TOP_LEFT -> Alignment.TopStart
-        ClockPosition.TOP_RIGHT -> Alignment.TopEnd
-        ClockPosition.BOTTOM_LEFT -> Alignment.BottomStart
-        ClockPosition.BOTTOM_RIGHT -> Alignment.BottomEnd
-        ClockPosition.CENTER -> Alignment.Center
-    }
-
-    Box(modifier = modifier, contentAlignment = alignment) {
-        GlassSurface(
-            modifier = Modifier.padding(
-                start = 20.dp,
-                end = 20.dp,
-                top = if (position == ClockPosition.TOP_LEFT || position == ClockPosition.TOP_RIGHT) 88.dp else 20.dp,
-                bottom = if (position == ClockPosition.BOTTOM_LEFT || position == ClockPosition.BOTTOM_RIGHT) 120.dp else 20.dp
-            ),
-            cornerRadius = 20.dp
+    GlassSurface(cornerRadius = 16.dp) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            modifier = Modifier.padding(horizontal = 20.dp, vertical = 10.dp)
         ) {
-            Column {
-                Text(
-                    text = time,
-                    color = GlassText,
-                    fontSize = 48.sp,
-                    fontWeight = FontWeight.Light
-                )
-                if (date != null) {
-                    Text(text = date, color = GlassTextMuted, fontSize = 16.sp)
-                }
+            Text(
+                text = time,
+                color = GlassText,
+                fontSize = 36.sp,
+                fontWeight = FontWeight.Light
+            )
+            if (date != null) {
+                Text(text = date, color = GlassTextMuted, fontSize = 13.sp, maxLines = 1)
             }
         }
     }
@@ -530,64 +576,4 @@ private fun GlassMusicChip(
             }
         }
     }
-}
-
-@Composable
-fun VideoPlayer(
-    uri: String,
-    isPlaying: Boolean,
-    mediaVolume: Float,
-    muteAudio: Boolean,
-    onVideoEnded: () -> Unit
-) {
-    val context = androidx.compose.ui.platform.LocalContext.current
-    val appContext = context.applicationContext
-    val exoPlayer = remember {
-        ExoPlayer.Builder(appContext).build()
-    }
-    val effectiveVolume = if (muteAudio) 0f else mediaVolume.coerceIn(0f, 1f)
-
-    LaunchedEffect(uri, muteAudio, mediaVolume, isPlaying) {
-        runCatching {
-            exoPlayer.stop()
-            exoPlayer.clearMediaItems()
-            exoPlayer.setMediaItem(ExoMediaItem.fromUri(uri))
-            exoPlayer.volume = effectiveVolume
-            exoPlayer.prepare()
-            if (isPlaying) exoPlayer.play() else exoPlayer.pause()
-        }
-    }
-
-    DisposableEffect(exoPlayer) {
-        val listener = object : androidx.media3.common.Player.Listener {
-            override fun onPlaybackStateChanged(state: Int) {
-                if (state == androidx.media3.common.Player.STATE_ENDED) onVideoEnded()
-            }
-        }
-        exoPlayer.addListener(listener)
-        onDispose {
-            exoPlayer.removeListener(listener)
-            exoPlayer.release()
-        }
-    }
-
-    AndroidView(
-        factory = { ctx ->
-            PlayerView(ctx).apply {
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                isFocusable = false
-                isFocusableInTouchMode = false
-                descendantFocusability = ViewGroup.FOCUS_BLOCK_DESCENDANTS
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            }
-        },
-        update = { playerView ->
-            playerView.player = exoPlayer
-        },
-        modifier = Modifier.fillMaxSize()
-    )
 }

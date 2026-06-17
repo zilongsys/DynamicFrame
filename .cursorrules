@@ -1,0 +1,6 @@
+# DynamicFrame
+
+Las reglas del proyecto están unificadas en **AGENTS.md** (raíz del repositorio).
+
+- Para modificar reglas del proyecto → edita solo `AGENTS.md`.
+- Cursor también aplica `.cursor/rules/dynamicframe.mdc` en cada sesión.

@@ -32,8 +32,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.dynamicframe.BuildConfig
 import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.MediaType
@@ -42,9 +40,10 @@ import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.presentation.browser.FolderBrowserDialog
 import com.dynamicframe.presentation.browser.StoragePicker
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
+import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
+import com.dynamicframe.presentation.permissions.MediaPermissionState
 import com.dynamicframe.presentation.permissions.rememberMediaPermissions
 import com.dynamicframe.presentation.settings.SettingsScreen
-import com.dynamicframe.presentation.settings.folderLabel
 import com.dynamicframe.presentation.settings.SettingsViewModel
 import com.dynamicframe.presentation.settings.SettingsDropdownItem
 import com.dynamicframe.presentation.settings.SettingsSliderItem
@@ -55,6 +54,7 @@ import com.dynamicframe.presentation.device.navLabel
 import com.dynamicframe.presentation.slideshow.AlbumPillOption
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.slideshow.SlideshowViewModel
+import com.dynamicframe.ui.components.AppAsyncImage
 import com.dynamicframe.ui.theme.NostalgiaAccent
 import com.dynamicframe.ui.theme.NostalgiaActionButton
 import com.dynamicframe.ui.theme.AppVersionLabel
@@ -77,7 +77,9 @@ fun HomeScreen(
     isTV: Boolean,
     onOpenFullscreen: () -> Unit,
     slideshowViewModel: SlideshowViewModel = hiltViewModel(),
-    settingsViewModel: SettingsViewModel = hiltViewModel()
+    settingsViewModel: SettingsViewModel = hiltViewModel(),
+    mediaPermissionDenied: Boolean = false,
+    permissions: MediaPermissionState? = null
 ) {
     var destination by remember { mutableStateOf<MemoriaDestination>(MemoriaDestination.AlbumActive) }
 
@@ -93,6 +95,9 @@ fun HomeScreen(
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
     val toastMessage by slideshowViewModel.toastMessage.collectAsStateWithLifecycle()
+
+    val localPermissions = rememberMediaPermissions()
+    val activePermissions = permissions ?: localPermissions
 
     val snackbarHostState = remember { SnackbarHostState() }
     LaunchedEffect(toastMessage) {
@@ -121,19 +126,16 @@ fun HomeScreen(
                 config = settingsConfig,
                 musicState = musicState,
                 albumLabel = albumLabel,
-                onPlayPause = {
-                    if (slideshowState.isPlaying) slideshowViewModel.pauseSlideshow()
-                    else slideshowViewModel.startSlideshow()
-                },
-                onNext = slideshowViewModel::nextSlide,
-                onPrev = slideshowViewModel::previousSlide,
+                showPermissionDenied = mediaPermissionDenied,
                 onOpenFullscreen = onOpenFullscreen,
                 onIntervalChange = settingsViewModel::updateInterval,
                 onTransitionChange = settingsViewModel::updateTransition,
-                onShuffleChange = { settingsViewModel.updateConfig(settingsConfig.copy(shuffle = it)) },
-                onLoopChange = { settingsViewModel.updateConfig(settingsConfig.copy(loop = it)) },
+                onPhotoShuffleChange = settingsViewModel::updatePhotoShuffle,
+                onVideoShuffleChange = settingsViewModel::updateVideoShuffle,
+                onMusicShuffleChange = settingsViewModel::updateMusicShuffle,
+                onLoopChange = settingsViewModel::updateLoop,
                 onVolumeChange = settingsViewModel::updateMusicVolume,
-                onUpdateConfig = settingsViewModel::updateConfig
+                onShowDateChange = settingsViewModel::updateShowDate
             )
 
             MemoriaDestination.Albums -> AlbumsPanel(
@@ -141,6 +143,7 @@ fun HomeScreen(
                 albums = albums,
                 selectedAlbumId = selectedAlbumId,
                 config = settingsConfig,
+                showPermissionDenied = mediaPermissionDenied,
                 onSelectAlbum = slideshowViewModel::selectAlbum,
                 onReload = slideshowViewModel::reloadMedia
             )
@@ -149,6 +152,8 @@ fun HomeScreen(
                 config = settingsConfig,
                 musicState = musicState,
                 isPlaybackActive = slideshowState.isPlaying,
+                permissions = activePermissions,
+                settingsViewModel = settingsViewModel,
                 onUpdateConfig = settingsViewModel::updateConfig,
                 onUpdateVolume = settingsViewModel::updateMusicVolume,
                 onToggleMusic = slideshowViewModel::toggleMusicPlayback,
@@ -157,6 +162,8 @@ fun HomeScreen(
 
             MemoriaDestination.Settings -> SettingsPanel(
                 settingsViewModel = settingsViewModel,
+                permissions = activePermissions,
+                showPermissionDenied = mediaPermissionDenied,
                 onReloadMedia = slideshowViewModel::reloadMedia
             )
 
@@ -175,7 +182,6 @@ fun HomeScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding)
-                    .then(if (device.isTv) Modifier.focusGroup() else Modifier)
             ) {
                 MemoriaSidebar(
                     selected = destination,
@@ -190,7 +196,6 @@ fun HomeScreen(
                             horizontal = device.contentPaddingH,
                             vertical = device.contentPaddingV
                         )
-                        .then(if (device.isTv) Modifier.focusGroup() else Modifier)
                 ) {
                     mainContent()
                 }
@@ -604,14 +609,12 @@ private fun ThumbnailCard(
             )
             .safeClickable(onClick = onClick)
     ) {
-        AsyncImage(
-            model = ImageRequest.Builder(LocalContext.current)
-                .data(item.uri)
-                .crossfade(true)
-                .build(),
+        AppAsyncImage(
+            uri = item.uri,
             contentDescription = item.name,
             modifier = Modifier.fillMaxSize(),
-            contentScale = ContentScale.Crop
+            contentScale = ContentScale.Crop,
+            crossfadeMillis = 300
         )
         if (item.type == MediaType.VIDEO) {
             Icon(
@@ -814,6 +817,7 @@ private fun AlbumsPanel(
     albums: List<MediaAlbum>,
     selectedAlbumId: String?,
     config: SlideshowConfig,
+    showPermissionDenied: Boolean,
     onSelectAlbum: (String?) -> Unit,
     onReload: () -> Unit
 ) {
@@ -831,6 +835,13 @@ private fun AlbumsPanel(
             fontSize = 14.sp
         )
         Spacer(Modifier.height(20.dp))
+
+        if (showPermissionDenied) {
+            MediaPermissionDeniedBanner(
+                message = "Activa el acceso a fotos y vídeos en Ajustes del sistema para ver tus álbumes."
+            )
+            Spacer(Modifier.height(16.dp))
+        }
 
         if (config.hasCustomMediaFolders()) {
             albumPills.forEach { pill ->
@@ -885,12 +896,13 @@ private fun MusicPanel(
     config: SlideshowConfig,
     musicState: com.dynamicframe.domain.model.MusicPlayerState,
     isPlaybackActive: Boolean,
+    permissions: MediaPermissionState,
+    settingsViewModel: SettingsViewModel,
     onUpdateConfig: (SlideshowConfig) -> Unit,
     onUpdateVolume: (Float) -> Unit,
     onToggleMusic: () -> Unit,
     onSkipTrack: () -> Unit
 ) {
-    val permissions = rememberMediaPermissions()
     val context = LocalContext.current
     val device = LocalDeviceProfile.current
     var showMusicFolderBrowser by remember { mutableStateOf(false) }
@@ -978,7 +990,7 @@ private fun MusicPanel(
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(folderLabel(uri), color = PaperInk, maxLines = 1, modifier = Modifier.weight(1f))
+                    Text(settingsViewModel.folderLabel(uri), color = PaperInk, maxLines = 1, modifier = Modifier.weight(1f))
                     Row(
                         modifier = Modifier
                             .safeClickable {
@@ -1023,15 +1035,16 @@ private fun MusicPanel(
 @Composable
 private fun SettingsPanel(
     settingsViewModel: SettingsViewModel,
+    permissions: MediaPermissionState,
+    showPermissionDenied: Boolean,
     onReloadMedia: () -> Unit
 ) {
-    val permissions = rememberMediaPermissions()
-
     SettingsScreen(
         viewModel = settingsViewModel,
         onBack = {},
         embedded = true,
         modifier = Modifier.fillMaxSize(),
+        showPermissionDenied = showPermissionDenied,
         requestMediaAccess = { onGranted ->
             permissions.requestFor(MediaPermissionKind.PHOTOS_VIDEOS, onGranted)
         },

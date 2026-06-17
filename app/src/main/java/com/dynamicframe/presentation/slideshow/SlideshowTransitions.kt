@@ -5,21 +5,11 @@ import androidx.compose.animation.core.*
 import androidx.compose.ui.unit.IntOffset
 import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.model.TransitionType
+import com.dynamicframe.domain.slideshow.transitionMillis
 
 private val SoftEasing = CubicBezierEasing(0.4f, 0f, 0.2f, 1f)
 private val DramaticEasing = CubicBezierEasing(0.22f, 1f, 0.36f, 1f)
 private val SnapEasing = CubicBezierEasing(0.2f, 0.8f, 0.2f, 1f)
-
-fun transitionMillis(type: TransitionType, configuredMs: Int): Int {
-    val base = configuredMs.coerceIn(600, 3200)
-    return when (type) {
-        TransitionType.NONE -> 0
-        TransitionType.DISSOLVE, TransitionType.CROSSFADE, TransitionType.KEN_BURNS ->
-            base.coerceIn(900, 3200)
-        TransitionType.BLUR_FADE -> (base * 1.1f).toInt()
-        else -> base
-    }
-}
 
 @OptIn(ExperimentalAnimationApi::class)
 fun AnimatedContentTransitionScope<MediaItem>.slideshowTransitionSpec(

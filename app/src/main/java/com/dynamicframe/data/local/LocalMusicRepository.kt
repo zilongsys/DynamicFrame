@@ -68,12 +68,12 @@ class LocalMusicRepository @Inject constructor(
                         tracks.add(
                             MusicTrack(
                                 id = "music_$id",
-                                uri = trackUri,
+                                uri = trackUri.toString(),
                                 title = cursor.getString(titleCol) ?: "Sin título",
                                 artist = cursor.getString(artistCol) ?: "Desconocido",
                                 album = cursor.getString(albumCol) ?: "",
                                 duration = cursor.getLong(durationCol),
-                                albumArtUri = albumArtUri
+                                albumArtUri = albumArtUri.toString()
                             )
                         )
                     }
@@ -129,7 +129,7 @@ class LocalMusicRepository @Inject constructor(
                             id = id.toString(),
                             name = cursor.getString(albumCol) ?: "Sin nombre",
                             source = MediaSource.LOCAL,
-                            coverUri = albumArtUri,
+                            coverUri = albumArtUri.toString(),
                             itemCount = cursor.getInt(countCol)
                         )
                     }

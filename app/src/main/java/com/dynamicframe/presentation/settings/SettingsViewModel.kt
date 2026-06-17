@@ -5,10 +5,19 @@ import androidx.lifecycle.viewModelScope
 import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.TransitionType
+import com.dynamicframe.domain.usecase.GetFolderDisplayNameUseCase
 import com.dynamicframe.domain.usecase.GetLocalAlbumsUseCase
+import com.dynamicframe.domain.usecase.ListStorageRootsUseCase
+import com.dynamicframe.domain.usecase.ListStorageSubfoldersUseCase
 import com.dynamicframe.domain.usecase.ObserveSlideshowConfigUseCase
 import com.dynamicframe.domain.usecase.SaveSlideshowConfigUseCase
-import com.dynamicframe.domain.repository.SettingsRepository
+import com.dynamicframe.domain.usecase.ToggleClockUseCase
+import com.dynamicframe.domain.usecase.ToggleShuffleUseCase
+import com.dynamicframe.domain.usecase.UpdateIntervalUseCase
+import com.dynamicframe.domain.usecase.UpdateMusicVolumeUseCase
+import com.dynamicframe.domain.usecase.UpdateSelectedAlbumsUseCase
+import com.dynamicframe.domain.usecase.UpdateSlideshowConfigUseCase
+import com.dynamicframe.domain.usecase.UpdateTransitionUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -16,19 +25,24 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 import javax.inject.Inject
 
 @HiltViewModel
 class SettingsViewModel @Inject constructor(
-    private val observeConfig: ObserveSlideshowConfigUseCase,
+    observeConfig: ObserveSlideshowConfigUseCase,
     private val saveConfig: SaveSlideshowConfigUseCase,
-    private val settingsRepository: SettingsRepository,
-    private val getLocalAlbums: GetLocalAlbumsUseCase
+    private val updateSlideshowConfig: UpdateSlideshowConfigUseCase,
+    private val setInterval: UpdateIntervalUseCase,
+    private val setTransition: UpdateTransitionUseCase,
+    private val setMusicVolume: UpdateMusicVolumeUseCase,
+    private val setShuffle: ToggleShuffleUseCase,
+    private val setClock: ToggleClockUseCase,
+    private val setSelectedAlbums: UpdateSelectedAlbumsUseCase,
+    private val getLocalAlbums: GetLocalAlbumsUseCase,
+    private val getFolderDisplayName: GetFolderDisplayNameUseCase,
+    private val listStorageRoots: ListStorageRootsUseCase,
+    private val listStorageSubfolders: ListStorageSubfoldersUseCase
 ) : ViewModel() {
-
-    private val configMutex = Mutex()
 
     val config: StateFlow<SlideshowConfig> = observeConfig()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SlideshowConfig())
@@ -53,83 +67,91 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun updateInterval(seconds: Int) {
-        viewModelScope.launch { settingsRepository.updateInterval(seconds) }
+        viewModelScope.launch { setInterval(seconds) }
     }
 
     fun updateTransition(type: TransitionType) {
-        viewModelScope.launch { settingsRepository.updateTransition(type) }
+        viewModelScope.launch { setTransition(type) }
     }
 
     fun updateMusicVolume(volume: Float) {
-        viewModelScope.launch { settingsRepository.updateMusicVolume(volume) }
+        viewModelScope.launch { setMusicVolume(volume) }
     }
 
     fun toggleShuffle(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.toggleShuffle(enabled) }
+        viewModelScope.launch { setShuffle(enabled) }
     }
 
     fun toggleClock(enabled: Boolean) {
-        viewModelScope.launch { settingsRepository.toggleClock(enabled) }
+        viewModelScope.launch { setClock(enabled) }
+    }
+
+    fun updatePhotoShuffle(enabled: Boolean) = updateConfigField { it.copy(photoShuffle = enabled) }
+
+    fun updateVideoShuffle(enabled: Boolean) = updateConfigField { it.copy(videoShuffle = enabled) }
+
+    fun updateMusicShuffle(enabled: Boolean) = updateConfigField { it.copy(musicShuffle = enabled) }
+
+    fun updateLoop(enabled: Boolean) = updateConfigField { it.copy(loop = enabled) }
+
+    fun updateShowDate(enabled: Boolean) = updateConfigField { it.copy(showDate = enabled) }
+
+    private fun updateConfigField(transform: (SlideshowConfig) -> SlideshowConfig) {
+        viewModelScope.launch { updateSlideshowConfig(transform) }
     }
 
     fun updateSelectedAlbums(albumIds: List<String>) {
-        viewModelScope.launch { settingsRepository.updateSelectedAlbums(albumIds) }
+        viewModelScope.launch { setSelectedAlbums(albumIds) }
     }
 
     fun addPhotoFolder(uri: String) {
         viewModelScope.launch {
-            configMutex.withLock {
-                val current = settingsRepository.getConfig()
-                if (current.photoFolderUris.contains(uri)) return@withLock
-                saveConfig(current.copy(photoFolderUris = current.photoFolderUris + uri))
+            updateSlideshowConfig { current ->
+                if (current.photoFolderUris.contains(uri)) current
+                else current.copy(photoFolderUris = current.photoFolderUris + uri)
             }
         }
     }
 
     fun removePhotoFolder(uri: String) {
         viewModelScope.launch {
-            configMutex.withLock {
-                val current = settingsRepository.getConfig()
-                saveConfig(current.copy(photoFolderUris = current.photoFolderUris - uri))
-            }
+            updateSlideshowConfig { it.copy(photoFolderUris = it.photoFolderUris - uri) }
         }
     }
 
     fun addVideoFolder(uri: String) {
         viewModelScope.launch {
-            configMutex.withLock {
-                val current = settingsRepository.getConfig()
-                if (current.videoFolderUris.contains(uri)) return@withLock
-                saveConfig(current.copy(videoFolderUris = current.videoFolderUris + uri))
+            updateSlideshowConfig { current ->
+                if (current.videoFolderUris.contains(uri)) current
+                else current.copy(videoFolderUris = current.videoFolderUris + uri)
             }
         }
     }
 
     fun removeVideoFolder(uri: String) {
         viewModelScope.launch {
-            configMutex.withLock {
-                val current = settingsRepository.getConfig()
-                saveConfig(current.copy(videoFolderUris = current.videoFolderUris - uri))
-            }
+            updateSlideshowConfig { it.copy(videoFolderUris = it.videoFolderUris - uri) }
         }
     }
 
     fun addMusicFolder(uri: String) {
         viewModelScope.launch {
-            configMutex.withLock {
-                val current = settingsRepository.getConfig()
-                if (current.musicFolderUris.contains(uri)) return@withLock
-                saveConfig(current.copy(musicFolderUris = current.musicFolderUris + uri))
+            updateSlideshowConfig { current ->
+                if (current.musicFolderUris.contains(uri)) current
+                else current.copy(musicFolderUris = current.musicFolderUris + uri)
             }
         }
     }
 
     fun removeMusicFolder(uri: String) {
         viewModelScope.launch {
-            configMutex.withLock {
-                val current = settingsRepository.getConfig()
-                saveConfig(current.copy(musicFolderUris = current.musicFolderUris - uri))
-            }
+            updateSlideshowConfig { it.copy(musicFolderUris = it.musicFolderUris - uri) }
         }
     }
+
+    fun folderLabel(uri: String): String = getFolderDisplayName(uri)
+
+    fun storageRoots() = listStorageRoots()
+
+    fun storageSubfolders(folderUri: String) = listStorageSubfolders(folderUri)
 }

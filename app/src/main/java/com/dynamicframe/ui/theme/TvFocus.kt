@@ -82,3 +82,28 @@ suspend fun FocusRequester.requestFocusWhenReady() {
     delay(100)
     runCatching { requestFocus() }
 }
+
+/** En TV, cualquier dirección del D-pad revela controles (estilo Netflix). */
+fun Modifier.tvRevealOnDpad(
+    enabled: Boolean,
+    onReveal: () -> Unit
+): Modifier {
+    if (!enabled) return this
+    return onKeyEvent { event ->
+        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+        when (event.key) {
+            Key.DirectionDown,
+            Key.DirectionUp,
+            Key.DirectionLeft,
+            Key.DirectionRight,
+            Key.DirectionCenter,
+            Key.Enter,
+            Key.NumPadEnter,
+            Key.ButtonA -> {
+                onReveal()
+                true
+            }
+            else -> false
+        }
+    }
+}

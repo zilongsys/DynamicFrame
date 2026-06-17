@@ -17,6 +17,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -61,7 +62,10 @@ fun MemoriaSidebar(
             .verticalScroll(rememberScrollState())
             .then(if (device.isTv) Modifier.focusGroup() else Modifier)
     ) {
-        Row(verticalAlignment = Alignment.Bottom) {
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.focusProperties { canFocus = false }
+        ) {
             Text(
                 "MEMORIA",
                 fontSize = 22.sp,
@@ -74,7 +78,12 @@ fun MemoriaSidebar(
                 fontSize = 11.sp
             )
         }
-        Text("cuadro interactivo", fontSize = 12.sp, color = MemoriaMuted)
+        Text(
+            "cuadro interactivo",
+            fontSize = 12.sp,
+            color = MemoriaMuted,
+            modifier = Modifier.focusProperties { canFocus = false }
+        )
         Spacer(Modifier.height(28.dp))
 
         RoadmapGroup.entries.forEach { group ->

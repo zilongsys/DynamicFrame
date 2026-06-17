@@ -2,6 +2,8 @@ package com.dynamicframe.ui.theme
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -16,9 +18,15 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
@@ -151,7 +159,7 @@ fun TvSwitchRow(
     }
 }
 
-/** Volumen / slider: en TV usa botones − y +. */
+/** Volumen en TV: una sola fila enfocable; ← → ajustan, OK sube un paso. */
 @Composable
 fun TvVolumeStepper(
     label: String,
@@ -159,40 +167,99 @@ fun TvVolumeStepper(
     value: Float,
     onValueChange: (Float) -> Unit,
     step: Float = 0.1f,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    showLabel: Boolean = true,
+    showInlineIcon: Boolean = false,
+    hintDescription: String = label,
+    onFocusHint: ((String) -> Unit)? = null,
+    /** Si false, ← → mueven el foco; ↑ ↓ ajustan volumen (barra con botones vecinos). */
+    horizontalKeysAdjustVolume: Boolean = true
 ) {
     val device = LocalDeviceProfile.current
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    FocusHintEffect(focused = focused, description = hintDescription, onHint = onFocusHint ?: {})
+
     Column(modifier = modifier.fillMaxWidth()) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(icon, label, tint = MemoriaMuted, modifier = Modifier.size(18.dp))
-            Text(label, color = MemoriaMuted, fontSize = 12.sp)
-        }
-        Spacer(Modifier.height(6.dp))
-        if (device.isTv) {
+        if (showLabel) {
             Row(
+                modifier = Modifier.focusProperties { canFocus = false },
                 verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                TvStepperChip(
-                    icon = Icons.Default.Remove,
-                    desc = "Bajar",
-                    onClick = { onValueChange((value - step).coerceIn(0f, 1f)) }
-                )
+                Icon(icon, label, tint = MemoriaMuted, modifier = Modifier.size(18.dp))
+                Text(label, color = MemoriaMuted, fontSize = 12.sp)
+            }
+            Spacer(Modifier.height(6.dp))
+        }
+        if (device.isTv) {
+            val shape = RoundedCornerShape(10.dp)
+            val borderColor = if (focused) MemoriaPurple else Color.Transparent
+            val bg = if (focused) MemoriaPurpleSoft else MemoriaSurface
+            val iconTint = if (focused) MemoriaPurple else MemoriaMuted
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(44.dp)
+                    .clip(shape)
+                    .background(bg, shape)
+                    .border(2.dp, borderColor, shape)
+                    .focusable(interactionSource = interactionSource)
+                    .onKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                        when (event.key) {
+                            Key.DirectionLeft -> {
+                                if (!horizontalKeysAdjustVolume) return@onKeyEvent false
+                                onValueChange((value - step).coerceIn(0f, 1f))
+                                true
+                            }
+                            Key.DirectionRight -> {
+                                if (!horizontalKeysAdjustVolume) return@onKeyEvent false
+                                onValueChange((value + step).coerceIn(0f, 1f))
+                                true
+                            }
+                            Key.DirectionUp -> {
+                                if (horizontalKeysAdjustVolume) return@onKeyEvent false
+                                onValueChange((value + step).coerceIn(0f, 1f))
+                                true
+                            }
+                            Key.DirectionDown -> {
+                                if (horizontalKeysAdjustVolume) return@onKeyEvent false
+                                onValueChange((value - step).coerceIn(0f, 1f))
+                                true
+                            }
+                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar, Key.ButtonA -> {
+                                onValueChange((value + step).coerceIn(0f, 1f))
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null,
+                        onClick = { onValueChange((value + step).coerceIn(0f, 1f)) }
+                    )
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (showInlineIcon) {
+                        Icon(icon, label, tint = iconTint, modifier = Modifier.size(22.dp))
+                    }
+                    Icon(Icons.Default.Remove, "Bajar volumen", tint = iconTint, modifier = Modifier.size(22.dp))
+                }
                 Text(
                     "${(value * 100).toInt()}%",
-                    color = MemoriaInk,
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.widthIn(min = 48.dp)
+                    color = if (focused) MemoriaPurple else MemoriaInk,
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.SemiBold
                 )
-                TvStepperChip(
-                    icon = Icons.Default.Add,
-                    desc = "Subir",
-                    onClick = { onValueChange((value + step).coerceIn(0f, 1f)) }
-                )
+                Icon(Icons.Default.Add, "Subir volumen", tint = iconTint, modifier = Modifier.size(22.dp))
             }
         } else {
             Slider(
@@ -238,10 +305,11 @@ fun MemoriaPlaybackCircleButton(
     contentDescription: String,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    size: Dp = 56.dp
+    size: Dp = 56.dp,
+    interactionSource: MutableInteractionSource? = null
 ) {
-    val interactionSource = remember { MutableInteractionSource() }
-    val focused by interactionSource.collectIsFocusedAsState()
+    val source = interactionSource ?: remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
     val iconSize = (size.value * 0.44f).dp
 
     val bg = if (focused) MemoriaPurple else MemoriaSurface
@@ -258,7 +326,7 @@ fun MemoriaPlaybackCircleButton(
                 onClick = onClick,
                 showFocusBorder = false,
                 focusShape = CircleShape,
-                interactionSource = interactionSource
+                interactionSource = source
             ),
         contentAlignment = Alignment.Center
     ) {

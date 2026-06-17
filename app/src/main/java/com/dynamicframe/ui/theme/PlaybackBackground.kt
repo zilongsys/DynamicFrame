@@ -8,10 +8,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import coil.compose.AsyncImage
-import coil.request.ImageRequest
 import com.dynamicframe.domain.model.PlaybackBackgroundType
+import com.dynamicframe.ui.components.AppAsyncImage
 
 object PlaybackBackgrounds {
     val demoLavender = Brush.linearGradient(
@@ -45,14 +43,11 @@ fun PlaybackLetterboxBackground(
             }
             PlaybackBackgroundType.CUSTOM_IMAGE -> {
                 if (customImageUri.isNotBlank()) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(customImageUri)
-                            .crossfade(300)
-                            .build(),
-                        contentDescription = null,
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
+                    AppAsyncImage(
+                        uri = customImageUri,
+                        crossfadeMillis = 300,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
                     )
                 } else {
                     Box(Modifier.fillMaxSize().background(Color.Black))

@@ -1,4 +1,4 @@
-package com.dynamicframe.presentation.slideshow
+package com.dynamicframe.domain.slideshow
 
 import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.model.MediaType
@@ -45,8 +45,12 @@ class SlideshowEngine @Inject constructor(
                 if (mediaKey != lastMediaKey) {
                     lastMediaKey = mediaKey
                     if (isInitialized) loadMedia()
-                } else if (previousConfig.shuffle != config.shuffle && mediaItems.isNotEmpty()) {
-                    applyShuffleKeepingCurrent(config.shuffle)
+                } else if (
+                    (previousConfig.photoShuffle != config.photoShuffle ||
+                        previousConfig.videoShuffle != config.videoShuffle) &&
+                    mediaItems.isNotEmpty()
+                ) {
+                    applyShuffleKeepingCurrent(config)
                 }
 
                 val scheduleKey = "${config.intervalSeconds}|${config.videoPlayFull}|${config.loop}"
@@ -67,10 +71,10 @@ class SlideshowEngine @Inject constructor(
 
     suspend fun loadMedia() = loadMutex.withLock {
         val previous = _state.value
-        val result = getSlideshowItems()
+        val result = withContext(Dispatchers.IO) { getSlideshowItems() }
         result.onSuccess { items ->
             mediaItems = items
-            shuffledItems = if (_config.value.shuffle) items.shuffled() else items
+            shuffledItems = buildPlaylist(items, _config.value)
 
             if (shuffledItems.isEmpty()) {
                 timerJob?.cancel()
@@ -111,9 +115,9 @@ class SlideshowEngine @Inject constructor(
         }
     }
 
-    private fun applyShuffleKeepingCurrent(shuffle: Boolean) {
+    private fun applyShuffleKeepingCurrent(config: SlideshowConfig) {
         val current = _state.value.currentItem ?: return
-        shuffledItems = if (shuffle) mediaItems.shuffled() else mediaItems
+        shuffledItems = buildPlaylist(mediaItems, config)
         val newIndex = shuffledItems.indexOfFirst { it.id == current.id }.let {
             if (it >= 0) it else 0
         }
@@ -131,9 +135,45 @@ class SlideshowEngine @Inject constructor(
         scheduleNext()
     }
 
+    fun beginSession() {
+        timerJob?.cancel()
+        transitionJob?.cancel()
+        if (mediaItems.isEmpty()) {
+            _state.value = _state.value.copy(isPlaying = true)
+            return
+        }
+        val config = _config.value
+        shuffledItems = buildPlaylist(mediaItems, config)
+        val startIndex = if (config.photoShuffle || config.videoShuffle) {
+            shuffledItems.indices.random()
+        } else {
+            0
+        }
+        val item = shuffledItems[startIndex]
+        _state.value = _state.value.copy(
+            playlistItems = shuffledItems,
+            currentIndex = startIndex,
+            currentItem = item,
+            isPlaying = true,
+            isTransitioning = false
+        )
+        preloadNext(startIndex)
+        scheduleNext()
+    }
+
     fun pause() {
         _state.value = _state.value.copy(isPlaying = false)
         timerJob?.cancel()
+    }
+
+    fun releaseCurrentForDelete() {
+        timerJob?.cancel()
+        transitionJob?.cancel()
+        _state.value = _state.value.copy(
+            currentItem = null,
+            nextItem = null,
+            isTransitioning = false
+        )
     }
 
     fun stop() {
@@ -166,7 +206,7 @@ class SlideshowEngine @Inject constructor(
     fun removeItem(itemId: String) {
         val removeIndex = _state.value.currentIndex
         mediaItems = mediaItems.filter { it.id != itemId }
-        shuffledItems = shuffledItems.filter { it.id != itemId }
+        shuffledItems = buildPlaylist(mediaItems, _config.value)
 
         if (shuffledItems.isEmpty()) {
             timerJob?.cancel()
@@ -195,10 +235,19 @@ class SlideshowEngine @Inject constructor(
         if (_state.value.isPlaying) scheduleNext()
     }
 
-    /** Solo avanza al terminar el vídeo si está configurado «reproducir completo». */
     fun onVideoCompleted() {
         if (!_state.value.isPlaying) return
         if (!_config.value.videoPlayFull) return
+        skipToNextOrPause()
+    }
+
+    /** Error de reproducción o carga: saltar al siguiente medio sin detener el slideshow. */
+    fun onPlaybackError() {
+        if (!_state.value.isPlaying) return
+        skipToNextOrPause()
+    }
+
+    private fun skipToNextOrPause() {
         val nextIdx = nextIndex()
         if (nextIdx == null) pause() else navigateTo(nextIdx)
     }
@@ -215,8 +264,7 @@ class SlideshowEngine @Inject constructor(
         timerJob = scope.launch {
             delay(intervalMs)
             if (_state.value.isPlaying) {
-                val nextIdx = nextIndex()
-                if (nextIdx == null) pause() else navigateTo(nextIdx)
+                skipToNextOrPause()
             }
         }
     }

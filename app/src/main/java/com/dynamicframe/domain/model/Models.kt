@@ -1,7 +1,5 @@
 package com.dynamicframe.domain.model
 
-import android.net.Uri
-
 enum class MediaSource {
     LOCAL,
     GOOGLE_PHOTOS,
@@ -11,7 +9,7 @@ enum class MediaSource {
 
 data class MediaItem(
     val id: String,
-    val uri: Uri,
+    val uri: String,
     val type: MediaType,
     val source: MediaSource,
     val name: String = "",
@@ -21,7 +19,7 @@ data class MediaItem(
     val height: Int = 0,
     val albumId: String = "",
     val albumName: String = "",
-    val thumbnailUri: Uri? = null
+    val thumbnailUri: String? = null
 )
 
 enum class MediaType {
@@ -43,18 +41,18 @@ data class MediaAlbum(
     val id: String,
     val name: String,
     val source: MediaSource,
-    val coverUri: Uri?,
+    val coverUri: String?,
     val itemCount: Int = 0
 )
 
 data class MusicTrack(
     val id: String,
-    val uri: Uri,
+    val uri: String,
     val title: String,
     val artist: String = "Desconocido",
     val album: String = "",
     val duration: Long = 0L,
-    val albumArtUri: Uri? = null
+    val albumArtUri: String? = null
 )
 
 enum class MusicSourceType {
@@ -78,7 +76,10 @@ enum class VideoMusicBehavior {
 data class SlideshowConfig(
     val intervalSeconds: Int = 8,
     val transition: TransitionType = TransitionType.CROSSFADE,
+    /** @deprecated Usar [photoShuffle] y [videoShuffle]. Se mantiene solo para migración. */
     val shuffle: Boolean = true,
+    val photoShuffle: Boolean = true,
+    val videoShuffle: Boolean = true,
     val loop: Boolean = true,
     val showClock: Boolean = true,
     val showDate: Boolean = true,

@@ -12,31 +12,30 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import com.dynamicframe.data.local.LocalStorageBrowser
+import com.dynamicframe.domain.model.StorageRoot
+import com.dynamicframe.domain.model.StorageSubfolder
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.NostalgiaAccent
 import com.dynamicframe.ui.theme.NostalgiaSelected
 import com.dynamicframe.ui.theme.safeClickable
-import java.io.File
 
 @Composable
 fun FolderBrowserDialog(
     visible: Boolean,
     title: String,
     onDismiss: () -> Unit,
-    onSelectFolder: (String) -> Unit
+    onSelectFolder: (String) -> Unit,
+    listRoots: () -> List<StorageRoot>,
+    listSubfolders: (String) -> List<StorageSubfolder>
 ) {
-    val context = LocalContext.current
     val device = LocalDeviceProfile.current
-    val roots = remember(context) { LocalStorageBrowser.defaultRoots(context) }
+    val roots = remember(visible) { if (visible) listRoots() else emptyList() }
 
-    // Pila de navegación: vacía = pantalla de raíces
-    var navigationStack by remember { mutableStateOf<List<File>>(emptyList()) }
+    var navigationStack by remember { mutableStateOf<List<String>>(emptyList()) }
 
     LaunchedEffect(visible) {
         if (visible) navigationStack = emptyList()
@@ -44,7 +43,6 @@ fun FolderBrowserDialog(
 
     if (!visible) return
 
-    // En TV el botón Atrás del mando no debe cerrar el explorador al navegar carpetas
     BackHandler {
         if (navigationStack.isNotEmpty()) {
             navigationStack = navigationStack.dropLast(1)
@@ -53,126 +51,18 @@ fun FolderBrowserDialog(
         }
     }
 
-    val currentDir = navigationStack.lastOrNull()
-    val entries = remember(currentDir, roots) {
-        if (currentDir == null) roots
-        else LocalStorageBrowser.listSubfolders(currentDir)
+    val currentFolderUri = navigationStack.lastOrNull()
+    val entries = remember(currentFolderUri, roots) {
+        if (currentFolderUri == null) {
+            roots.map { StorageSubfolder(it.label, it.folderUri, it.readable) }
+        } else {
+            listSubfolders(currentFolderUri)
+        }
     }
 
     val pathLabel = when {
-        currentDir != null -> currentDir.absolutePath
+        currentFolderUri != null -> currentFolderUri
         else -> "Elige ubicación — USB suele estar en «Todos los discos» o «USB/SD»"
-    }
-
-    val browserContent: @Composable () -> Unit = {
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (device.isTv) Modifier.focusGroup() else Modifier)
-        ) {
-            // Cabecera
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(MaterialTheme.colorScheme.surfaceVariant)
-                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                    Text(
-                        pathLabel,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        maxLines = 3
-                    )
-                }
-                Row(
-                    modifier = Modifier.safeClickable(onClick = onDismiss),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
-                    if (device.isTv) {
-                        Text("Cerrar", fontSize = MaterialTheme.typography.bodySmall.fontSize)
-                    }
-                }
-            }
-
-            // Acciones de navegación
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .background(NostalgiaSelected.copy(alpha = 0.35f))
-                    .padding(horizontal = 8.dp, vertical = 4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                if (navigationStack.isNotEmpty()) {
-                    NavActionChip(
-                        label = "Atrás (..)",
-                        icon = Icons.Default.ArrowUpward,
-                        onClick = { navigationStack = navigationStack.dropLast(1) }
-                    )
-                }
-                if (currentDir != null && currentDir.canRead()) {
-                    NavActionChip(
-                        label = "Usar esta carpeta",
-                        icon = Icons.Default.CheckCircle,
-                        primary = true,
-                        onClick = {
-                            onSelectFolder(LocalStorageBrowser.toFolderUri(currentDir))
-                            onDismiss()
-                        }
-                    )
-                }
-                if (navigationStack.isNotEmpty()) {
-                    NavActionChip(
-                        label = "Inicio",
-                        icon = Icons.Default.Home,
-                        onClick = { navigationStack = emptyList() }
-                    )
-                }
-            }
-
-            HorizontalDivider()
-
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(vertical = 8.dp)
-            ) {
-                if (entries.isEmpty()) {
-                    item {
-                        Text(
-                            text = if (currentDir == null) {
-                                "No se detectaron ubicaciones. Conecta un USB y vuelve a abrir el explorador."
-                            } else {
-                                "Sin subcarpetas visibles. Pulsa «Usar esta carpeta» si tus fotos están aquí."
-                            },
-                            modifier = Modifier.padding(16.dp),
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
-
-                items(entries, key = { it.path.absolutePath }) { entry ->
-                    FolderRow(
-                        name = entry.name,
-                        icon = when {
-                            !entry.readable -> Icons.Default.Lock
-                            currentDir == null && entry.name.contains("USB", ignoreCase = true) -> Icons.Default.Usb
-                            else -> Icons.Default.Folder
-                        },
-                        enabled = entry.readable,
-                        onClick = {
-                            if (entry.readable) {
-                                navigationStack = navigationStack + entry.path
-                            }
-                        }
-                    )
-                }
-            }
-        }
     }
 
     Dialog(
@@ -195,7 +85,112 @@ fun FolderBrowserDialog(
             shape = if (device.isTv) MaterialTheme.shapes.extraSmall else MaterialTheme.shapes.large,
             tonalElevation = 4.dp
         ) {
-            browserContent()
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .then(if (device.isTv) Modifier.focusGroup() else Modifier)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(MaterialTheme.colorScheme.surfaceVariant)
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+                        Text(
+                            pathLabel,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            maxLines = 3
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.safeClickable(onClick = onDismiss),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(Icons.Default.Close, contentDescription = "Cerrar", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (device.isTv) {
+                            Text("Cerrar", fontSize = MaterialTheme.typography.bodySmall.fontSize)
+                        }
+                    }
+                }
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(NostalgiaSelected.copy(alpha = 0.35f))
+                        .padding(horizontal = 8.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    if (navigationStack.isNotEmpty()) {
+                        NavActionChip(
+                            label = "Atrás (..)",
+                            icon = Icons.Default.ArrowUpward,
+                            onClick = { navigationStack = navigationStack.dropLast(1) }
+                        )
+                    }
+                    if (currentFolderUri != null) {
+                        NavActionChip(
+                            label = "Usar esta carpeta",
+                            icon = Icons.Default.CheckCircle,
+                            primary = true,
+                            onClick = {
+                                onSelectFolder(currentFolderUri)
+                                onDismiss()
+                            }
+                        )
+                    }
+                    if (navigationStack.isNotEmpty()) {
+                        NavActionChip(
+                            label = "Inicio",
+                            icon = Icons.Default.Home,
+                            onClick = { navigationStack = emptyList() }
+                        )
+                    }
+                }
+
+                HorizontalDivider()
+
+                LazyColumn(
+                    modifier = Modifier.fillMaxSize(),
+                    contentPadding = PaddingValues(vertical = 8.dp)
+                ) {
+                    if (entries.isEmpty()) {
+                        item {
+                            Text(
+                                text = if (currentFolderUri == null) {
+                                    "No se detectaron ubicaciones. Conecta un USB y vuelve a abrir el explorador."
+                                } else {
+                                    "Sin subcarpetas visibles. Pulsa «Usar esta carpeta» si tus fotos están aquí."
+                                },
+                                modifier = Modifier.padding(16.dp),
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
+
+                    items(entries, key = { it.folderUri }) { entry ->
+                        FolderRow(
+                            name = entry.label,
+                            icon = when {
+                                !entry.readable -> Icons.Default.Lock
+                                currentFolderUri == null && entry.label.contains("USB", ignoreCase = true) -> Icons.Default.Usb
+                                else -> Icons.Default.Folder
+                            },
+                            enabled = entry.readable,
+                            onClick = {
+                                if (entry.readable) {
+                                    navigationStack = navigationStack + entry.folderUri
+                                }
+                            }
+                        )
+                    }
+                }
+            }
         }
     }
 }

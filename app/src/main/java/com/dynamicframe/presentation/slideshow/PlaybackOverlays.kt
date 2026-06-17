@@ -26,6 +26,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.dynamicframe.presentation.device.LocalDeviceProfile
+import com.dynamicframe.ui.theme.FocusHintEffect
 import com.dynamicframe.ui.theme.MemoriaPurple
 import com.dynamicframe.ui.theme.NostalgiaAccent
 import com.dynamicframe.ui.theme.NostalgiaFocus
@@ -55,6 +56,8 @@ fun CenterPlayPauseButton(
     modifier: Modifier = Modifier,
     buttonSize: Dp = 88.dp,
     onFocusChanged: (Boolean) -> Unit = {},
+    hintDescription: String = if (isPlaying) "Pausar reproducción" else "Reanudar reproducción",
+    onFocusHint: ((String) -> Unit)? = null,
     @Suppress("UNUSED_PARAMETER") filled: Boolean = false
 ) {
     MediaCircleButton(
@@ -63,7 +66,9 @@ fun CenterPlayPauseButton(
         onClick = onClick,
         modifier = modifier,
         size = buttonSize,
-        onFocusChanged = onFocusChanged
+        onFocusChanged = onFocusChanged,
+        hintDescription = hintDescription,
+        onFocusHint = onFocusHint
     )
 }
 
@@ -74,11 +79,14 @@ fun MediaCircleButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     size: Dp = 48.dp,
-    onFocusChanged: (Boolean) -> Unit = {}
+    onFocusChanged: (Boolean) -> Unit = {},
+    hintDescription: String = contentDescription,
+    onFocusHint: ((String) -> Unit)? = null
 ) {
     val device = LocalDeviceProfile.current
     val interactionSource = remember { MutableInteractionSource() }
     val focused by interactionSource.collectIsFocusedAsState()
+    FocusHintEffect(focused = focused, description = hintDescription, onHint = onFocusHint ?: {})
     val iconSize = (size.value * 0.46f).dp
 
     val bg = when {

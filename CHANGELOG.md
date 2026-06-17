@@ -1,5 +1,112 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.28
+
+### Arquitectura (AGENTS.md)
+- Vídeo del slideshow: `SlideshowVideoPlayerRepository` en domain/data; sin `ExoPlayer.Builder` en Composables.
+- Imágenes: precarga vía `PreloadSlideshowImagesUseCase`; UI usa `AppAsyncImage` (Coil centralizado).
+- Música: `onPlayerError` salta a la siguiente pista.
+- Permisos: comprobación al inicio; banner en modo cuadro; estado compartido en navegación.
+- DataStore: nombre de archivo y clave de autostart unificados en `SlideshowPreferencesKeys`.
+- Corregido import de `GetLocalAlbumsUseCase` en `SettingsViewModel`.
+
+## v0.1.27
+
+### Arquitectura
+- Limpieza de `SettingsScreen`: sin `LocalStorageBrowser` ni `folderLabel` global.
+- URIs de medios como `String` en presentation (`SlideshowMediaContent`, carpetas).
+- `StorageBrowserRepository` + `GetFolderDisplayNameUseCase` unifican etiquetas de carpetas.
+- Permiso denegado: banner claro en álbum activo, álbumes, música y ajustes.
+- `MediaPermissions` con callback `onPermissionDenied`; estado compartido en `HomeScreen`.
+- Deuda técnica actualizada en `AGENTS.md` (música vía `MusicPlaybackRepository`, URIs en domain).
+
+## v0.1.26
+
+### Arquitectura
+- Guía del proyecto en `AGENTS.md` (stack, capas, Hilt, ExoPlayer, permisos).
+- `SlideshowEngine` movido a `domain/slideshow/`.
+- Claves DataStore centralizadas en `SlideshowPreferencesKeys`.
+- ViewModels usan solo casos de uso (sin Coil/Repository directo en presentation).
+- `ImageCacheRepository` + `EvictMediaCacheUseCase` para limpiar caché al borrar medios.
+- Errores de vídeo/imagen en slideshow: salta al siguiente medio sin detener la sesión.
+
+## v0.1.25
+
+### Corregido
+- Lista al mantener OK en duración/transición: ya no se cierra sola al soltar el botón.
+- Toggles del álbum activo: el recuadro violeta se marca correctamente al activar/desactivar.
+- Borrar en modo cuadro sin pausar: libera imagen/vídeo antes de eliminar el archivo.
+- Volumen en modo cuadro: ← → pasan al siguiente botón; ↑ ↓ ajustan volumen.
+
+### Actualizado
+- Icono aleatorio más claro (outline) en álbum activo.
+- Reloj del modo cuadro centrado arriba, sin tapar controles.
+- Descripciones al enfocar cada botón en el modo cuadro.
+
+## v0.1.24
+
+### Añadido
+- Modo cuadro/teatro: al entrar, si el aleatorio está activo, empieza en foto/vídeo y pista aleatorios.
+- Botón **Reiniciar** en el modo teatro: vuelve a empezar aplicando el aleatorio de imágenes y música.
+
+### Actualizado
+- Entrada al modo cuadro inicia sesión nueva (reordenación según ajustes) sin afectar al reanudar tras pausa.
+
+## v0.1.23
+
+### Actualizado
+- Modo cuadro: icono de telón de teatro; al entrar reproduce fotos, vídeos y música (sin botón Play en el panel).
+- Controles del álbum: descripción al enfocar cada botón; aleatorio con iconos grandes (foto/video/música + shuffle) sin texto.
+- Fila de volumen con icono; toggles activos mantienen borde y fondo violeta.
+
+### Corregido
+- Interruptores de aleatorio, bucle y leyenda: el estado activo ya no se pierde al activar/desactivar varias veces.
+
+## v0.1.22
+
+### Añadido
+- Modo cuadro: reproduce al entrar y se detiene al salir.
+- Aleatorio independiente para fotos, videos y música.
+- Icono de modo cuadro cambiado a cámara.
+
+## v0.1.21
+
+### Actualizado
+- Álbum activo sin vista previa; controles en una fila (duración, transición, leyenda, bucle, aleatorio).
+- Volumen centrado debajo de los chips; alturas fijas para evitar saltos al enfocar.
+
+### Corregido
+- Lista al mantener OK: ya no parpadea (supresión de OK corto tras diálogo).
+
+## v0.1.20
+
+### Actualizado
+- Panel álbum activo en 2 columnas (TV y móvil): duración/volumen | transición/switches.
+- Duración y transición: mantener OK abre diálogo con lista navegable (reemplaza DropdownMenu en TV).
+
+### Corregido
+- Pulsación larga en TV: detección por temporizador + repeticiones de tecla (mandos sin KeyUp).
+
+## v0.1.19
+
+### Actualizado
+- Barra de resumen del álbum activo: iconos (fotos, videos, duración, pistas) + valor.
+- Volumen TV: control único enfocable; ← → ajustan el nivel (sin saltar entre dos botones).
+- Duración y transición: OK corto cicla valor; mantener OK ~0,5 s abre la lista completa.
+
+## v0.1.18
+
+### Corregido
+- Volumen −/+ en álbum activo: foco enlazado explícitamente (← → entre botones).
+- Pantalla completa: D-pad (abajo/OK) muestra controles estilo Netflix; ↓ desde pausa baja a la barra inferior.
+- Reanudar ya no reinicia la canción: `play()` conserva la posición; solo carga playlist si cambió.
+
+## v0.1.17
+
+### Corregido
+- Navegación D-pad en álbum activo: volumen −/+, sidebar ↔ contenido, controles del panel.
+- La música ya no arranca sola al abrir la app; solo reproduce al pulsar Play o iniciar slideshow.
+
 ## v0.1.16
 
 ### Añadido
