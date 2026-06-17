@@ -56,6 +56,7 @@ fun rememberMediaPermissions(
     onPermissionDenied: () -> Unit = {}
 ): MediaPermissionState {
     val context = LocalContext.current
+    val currentContext = rememberUpdatedState(context)
     val deniedCallback = rememberUpdatedState(onPermissionDenied)
     val stateHolder = remember { mutableStateOf<MediaPermissionState?>(null) }
 
@@ -70,8 +71,8 @@ fun rememberMediaPermissions(
             requestLauncher = { perms -> launcher.launch(perms) },
             missingPermissions = { perms ->
                 perms.filter {
-                    ContextCompat.checkSelfPermission(context, it) !=
-                        android.content.pm.PackageManager.PERMISSION_GRANTED
+                    ContextCompat.checkSelfPermission(currentContext.value, it) !=
+                        PackageManager.PERMISSION_GRANTED
                 }.toTypedArray()
             },
             defaultOnDenied = { deniedCallback.value() }

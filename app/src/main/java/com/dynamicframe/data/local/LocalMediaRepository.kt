@@ -92,7 +92,8 @@ class LocalMediaRepository @Inject constructor(
                         1
                     )
                 } else {
-                    val (album, count) = albums[bucketId]!!
+                    val existing = albums[bucketId] ?: return@while
+                    val (album, count) = existing
                     albums[bucketId] = Pair(album.copy(itemCount = count + 1), count + 1)
                 }
             }
@@ -140,7 +141,8 @@ class LocalMediaRepository @Inject constructor(
                         1
                     )
                 } else {
-                    val (album, count) = albums[bucketId]!!
+                    val existing = albums[bucketId] ?: return@while
+                    val (album, count) = existing
                     albums[bucketId] = Pair(album.copy(itemCount = count + 1), count + 1)
                 }
             }

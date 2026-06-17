@@ -2,6 +2,7 @@ package com.dynamicframe.data.player
 
 import android.content.ComponentName
 import android.content.Context
+import androidx.core.content.ContextCompat
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.session.MediaController
@@ -38,6 +39,12 @@ class MusicPlayerController @Inject constructor(
     private var volumeBeforeVideo: Float? = null
     private var wasPlayingBeforeVideo = false
 
+    private val mainExecutor get() = ContextCompat.getMainExecutor(context)
+
+    private fun updateStateOnMain(block: () -> Unit) {
+        mainExecutor.execute(block)
+    }
+
     /** Espera a que el MediaController esté listo (connect es asíncrono). */
     override suspend fun ensureConnected() = connectMutex.withLock {
         controller?.let { return }
@@ -65,8 +72,10 @@ class MusicPlayerController @Inject constructor(
             try {
                 controller = controllerFuture?.get()
                 controller?.addListener(playerListener)
-                flushPendingPlaylist()
-                syncState()
+                updateStateOnMain {
+                    flushPendingPlaylist()
+                    syncState()
+                }
                 if (!deferred.isCompleted) deferred.complete(Unit)
             } catch (e: Exception) {
                 controller = null
@@ -74,7 +83,7 @@ class MusicPlayerController @Inject constructor(
                 connectionDeferred = null
                 if (!deferred.isCompleted) deferred.completeExceptionally(e)
             }
-        }, { it.run() })
+        }, mainExecutor)
     }
 
     override fun disconnect() {
@@ -194,21 +203,27 @@ class MusicPlayerController @Inject constructor(
 
     private val playerListener = object : Player.Listener {
         override fun onIsPlayingChanged(isPlaying: Boolean) {
-            _state.value = _state.value.copy(isPlaying = isPlaying)
+            updateStateOnMain {
+                _state.value = _state.value.copy(isPlaying = isPlaying)
+            }
         }
 
         override fun onMediaItemTransition(mediaItem: MediaItem?, reason: Int) {
-            val idx = controller?.currentMediaItemIndex ?: 0
-            _state.value = _state.value.copy(
-                currentTrack = currentPlaylist.getOrNull(idx),
-                currentIndex = idx
-            )
+            updateStateOnMain {
+                val idx = controller?.currentMediaItemIndex ?: 0
+                _state.value = _state.value.copy(
+                    currentTrack = currentPlaylist.getOrNull(idx),
+                    currentIndex = idx
+                )
+            }
         }
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
-            if (currentPlaylist.isNotEmpty()) {
-                controller?.seekToNextMediaItem()
-                syncState()
+            updateStateOnMain {
+                if (currentPlaylist.isNotEmpty()) {
+                    controller?.seekToNextMediaItem()
+                    syncState()
+                }
             }
         }
     }

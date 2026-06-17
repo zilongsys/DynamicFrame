@@ -1,5 +1,15 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.31
+
+### Corregido (auditoría de código)
+- `SlideshowEngine.loadMedia`: actualización de estado en hilo principal tras IO.
+- `SlideshowEngine.beginSession`: no marca `isPlaying` con playlist vacía.
+- `MusicPlayerController`: callbacks de ExoPlayer en el hilo principal.
+- `MusicPlaybackService.onDestroy`: libera player aunque falle la sesión.
+- `LocalMediaRepository`: eliminado `!!` en conteo de álbumes.
+- `Navigation`: limpia banner de permiso al conceder acceso.
+
 ## v0.1.30
 
 ### Corregido

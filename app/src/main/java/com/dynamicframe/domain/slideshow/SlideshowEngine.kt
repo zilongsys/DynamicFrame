@@ -72,46 +72,48 @@ class SlideshowEngine @Inject constructor(
     suspend fun loadMedia() = loadMutex.withLock {
         val previous = _state.value
         val result = withContext(Dispatchers.IO) { getSlideshowItems() }
-        result.onSuccess { items ->
-            mediaItems = items
-            shuffledItems = buildPlaylist(items, _config.value)
+        withContext(Dispatchers.Main.immediate) {
+            result.onSuccess { items ->
+                mediaItems = items
+                shuffledItems = buildPlaylist(items, _config.value)
 
-            if (shuffledItems.isEmpty()) {
-                timerJob?.cancel()
-                _state.value = previous.copy(
-                    totalItems = 0,
-                    allItems = emptyList(),
-                    playlistItems = emptyList(),
-                    currentItem = null,
-                    currentIndex = 0,
-                    nextItem = null,
-                    error = "No hay fotos o videos. Configura carpetas en Ajustes."
-                )
-                return@withLock
-            }
-
-            val previousId = previous.currentItem?.id
-            val newIndex = when {
-                previousId != null -> {
-                    val idx = shuffledItems.indexOfFirst { it.id == previousId }
-                    if (idx >= 0) idx else previous.currentIndex.coerceIn(0, shuffledItems.lastIndex)
+                if (shuffledItems.isEmpty()) {
+                    timerJob?.cancel()
+                    _state.value = previous.copy(
+                        totalItems = 0,
+                        allItems = emptyList(),
+                        playlistItems = emptyList(),
+                        currentItem = null,
+                        currentIndex = 0,
+                        nextItem = null,
+                        error = "No hay fotos o videos. Configura carpetas en Ajustes."
+                    )
+                    return@withContext
                 }
-                else -> previous.currentIndex.coerceIn(0, shuffledItems.lastIndex)
-            }
 
-            _state.value = previous.copy(
-                totalItems = items.size,
-                allItems = items,
-                playlistItems = shuffledItems,
-                currentIndex = newIndex,
-                currentItem = shuffledItems[newIndex],
-                error = null,
-                isTransitioning = false
-            )
-            preloadNext(newIndex)
-            if (_state.value.isPlaying) scheduleNext()
-        }.onFailure { e ->
-            _state.value = previous.copy(error = e.message ?: "Error al cargar medios")
+                val previousId = previous.currentItem?.id
+                val newIndex = when {
+                    previousId != null -> {
+                        val idx = shuffledItems.indexOfFirst { it.id == previousId }
+                        if (idx >= 0) idx else previous.currentIndex.coerceIn(0, shuffledItems.lastIndex)
+                    }
+                    else -> previous.currentIndex.coerceIn(0, shuffledItems.lastIndex)
+                }
+
+                _state.value = previous.copy(
+                    totalItems = items.size,
+                    allItems = items,
+                    playlistItems = shuffledItems,
+                    currentIndex = newIndex,
+                    currentItem = shuffledItems[newIndex],
+                    error = null,
+                    isTransitioning = false
+                )
+                preloadNext(newIndex)
+                if (_state.value.isPlaying) scheduleNext()
+            }.onFailure { e ->
+                _state.value = previous.copy(error = e.message ?: "Error al cargar medios")
+            }
         }
     }
 
@@ -139,7 +141,10 @@ class SlideshowEngine @Inject constructor(
         timerJob?.cancel()
         transitionJob?.cancel()
         if (mediaItems.isEmpty()) {
-            _state.value = _state.value.copy(isPlaying = true)
+            _state.value = _state.value.copy(
+                isPlaying = false,
+                error = "No hay fotos o videos. Configura carpetas en Ajustes."
+            )
             return
         }
         val config = _config.value

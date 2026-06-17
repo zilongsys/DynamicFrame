@@ -86,7 +86,7 @@ class GetMusicTracksUseCase @Inject constructor(
                 musicRepository.getLocalTracks()
             MusicSourceType.SPOTIFY, MusicSourceType.YOUTUBE ->
                 Result.success(emptyList())
-        }.map { tracks -> tracks }
+        }
     }
 }
 

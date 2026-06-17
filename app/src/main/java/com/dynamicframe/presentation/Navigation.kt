@@ -46,9 +46,8 @@ fun DynamicFrameNavHost(
     val permissions = rememberMediaPermissions { mediaPermissionDenied = true }
 
     LaunchedEffect(settingsConfig.photoFolderUris, settingsConfig.videoFolderUris) {
-        if (!settingsConfig.hasCustomMediaFolders() && hasMissingMediaPermissions(activity)) {
-            mediaPermissionDenied = true
-        }
+        val usesMediaStore = !settingsConfig.hasCustomMediaFolders()
+        mediaPermissionDenied = usesMediaStore && hasMissingMediaPermissions(activity)
     }
 
     var fullscreenNavLocked by remember { mutableStateOf(false) }

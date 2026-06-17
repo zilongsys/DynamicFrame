@@ -52,10 +52,10 @@ class MusicPlaybackService : MediaSessionService() {
         mediaSession
 
     override fun onDestroy() {
-        mediaSession?.run {
+        mediaSession?.release()
+        mediaSession = null
+        if (::player.isInitialized) {
             player.release()
-            release()
-            mediaSession = null
         }
         super.onDestroy()
     }
