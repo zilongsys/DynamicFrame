@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.36
+
+### Corregido
+- DataStore de ajustes y depuración centralizados en Hilt (`DataStoreModule`): una sola instancia por archivo, sin delegados duplicados.
+
 ## v0.1.35
 
 ### Corregido

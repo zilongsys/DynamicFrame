@@ -1,15 +1,15 @@
 package com.dynamicframe.data.debug
 
-import android.content.Context
 import android.util.Log
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
-import androidx.datastore.preferences.preferencesDataStore
 import com.dynamicframe.BuildConfig
+import com.dynamicframe.di.DebugSettingsDataStore
 import com.dynamicframe.domain.debug.DebugLevel
 import com.dynamicframe.domain.debug.DebugLogEntry
 import com.dynamicframe.domain.repository.AppDebugLogger
-import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -26,15 +26,11 @@ import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.debugPrefsDataStore by preferencesDataStore(
-    name = "app_debug"
-)
-
 private val DEBUG_MODE = booleanPreferencesKey("debug_mode")
 
 @Singleton
 class AndroidAppDebugLogger @Inject constructor(
-    @ApplicationContext private val context: Context
+    @DebugSettingsDataStore private val debugDataStore: DataStore<Preferences>
 ) : AppDebugLogger {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
@@ -51,7 +47,7 @@ class AndroidAppDebugLogger @Inject constructor(
 
     override suspend fun load() {
         val stored = runCatching {
-            context.debugPrefsDataStore.data.first()[DEBUG_MODE]
+            debugDataStore.data.first()[DEBUG_MODE]
         }.getOrNull()
         _enabled.value = stored ?: BuildConfig.DEBUG_TOOLS_DEFAULT
         if (_enabled.value) {
@@ -61,7 +57,7 @@ class AndroidAppDebugLogger @Inject constructor(
 
     override suspend fun setEnabled(enabled: Boolean) {
         _enabled.value = enabled
-        context.debugPrefsDataStore.edit { prefs ->
+        debugDataStore.edit { prefs ->
             prefs[DEBUG_MODE] = enabled
         }
         i("Debug", if (enabled) "Modo depuración activado" else "Modo depuración desactivado")

@@ -3,7 +3,7 @@ package com.dynamicframe.data.local
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.*
-import androidx.datastore.preferences.preferencesDataStore
+import com.dynamicframe.di.SlideshowSettingsDataStore
 import com.dynamicframe.domain.model.*
 import com.dynamicframe.domain.model.allMediaFolderUris
 import com.dynamicframe.domain.repository.SettingsRepository
@@ -15,13 +15,10 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
 
-private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(
-    name = SlideshowPreferencesKeys.DATASTORE_FILE
-)
-
 @Singleton
 class DataStoreSettingsRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    @SlideshowSettingsDataStore private val dataStore: DataStore<Preferences>
 ) : SettingsRepository {
 
     @Volatile
@@ -30,18 +27,18 @@ class DataStoreSettingsRepository @Inject constructor(
     private val Keys get() = SlideshowPreferencesKeys
 
     override fun observeConfig(): Flow<SlideshowConfig> =
-        context.dataStore.data
+        dataStore.data
             .map { prefs -> prefs.toConfig().also { cachedConfig = it } }
             .catch {
                 emit(cachedConfig)
             }
 
     override suspend fun getConfig(): SlideshowConfig = runCatching {
-        context.dataStore.data.first().toConfig().also { cachedConfig = it }
+        dataStore.data.first().toConfig().also { cachedConfig = it }
     }.getOrElse { cachedConfig }
 
     override suspend fun saveConfig(config: SlideshowConfig) {
-        context.dataStore.edit { prefs ->
+        dataStore.edit { prefs ->
             prefs[Keys.INTERVAL] = config.intervalSeconds
             prefs[Keys.TRANSITION] = config.transition.name
             prefs[Keys.SHUFFLE] = config.photoShuffle && config.videoShuffle
@@ -91,19 +88,19 @@ class DataStoreSettingsRepository @Inject constructor(
     }
 
     override suspend fun updateInterval(seconds: Int) {
-        context.dataStore.edit { it[Keys.INTERVAL] = seconds }
+        dataStore.edit { it[Keys.INTERVAL] = seconds }
     }
 
     override suspend fun updateTransition(type: TransitionType) {
-        context.dataStore.edit { it[Keys.TRANSITION] = type.name }
+        dataStore.edit { it[Keys.TRANSITION] = type.name }
     }
 
     override suspend fun updateMusicVolume(volume: Float) {
-        context.dataStore.edit { it[Keys.MUSIC_VOLUME] = volume }
+        dataStore.edit { it[Keys.MUSIC_VOLUME] = volume }
     }
 
     override suspend fun toggleShuffle(enabled: Boolean) {
-        context.dataStore.edit {
+        dataStore.edit {
             it[Keys.SHUFFLE] = enabled
             it[Keys.PHOTO_SHUFFLE] = enabled
             it[Keys.VIDEO_SHUFFLE] = enabled
@@ -111,11 +108,11 @@ class DataStoreSettingsRepository @Inject constructor(
     }
 
     override suspend fun toggleClock(enabled: Boolean) {
-        context.dataStore.edit { it[Keys.SHOW_CLOCK] = enabled }
+        dataStore.edit { it[Keys.SHOW_CLOCK] = enabled }
     }
 
     override suspend fun updateSelectedAlbums(albumIds: List<String>) {
-        context.dataStore.edit { it[Keys.SELECTED_ALBUMS] = albumIds.joinToString("|") }
+        dataStore.edit { it[Keys.SELECTED_ALBUMS] = albumIds.joinToString("|") }
     }
 
     private fun syncBootPreference(autoStart: Boolean) {
