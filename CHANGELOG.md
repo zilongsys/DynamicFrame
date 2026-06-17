@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.29
+
+### Corregido
+- Compilación KSP/Hilt: import faltante de `ImageCacheRepository` en `RepositoryModule`.
+
 ## v0.1.28
 
 ### Arquitectura (AGENTS.md)

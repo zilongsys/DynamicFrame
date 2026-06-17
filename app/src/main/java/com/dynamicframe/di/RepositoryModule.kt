@@ -6,6 +6,7 @@ import com.dynamicframe.data.local.LocalMediaRepository
 import com.dynamicframe.data.local.LocalMusicRepository
 import com.dynamicframe.data.local.LocalStorageBrowserRepository
 import com.dynamicframe.domain.repository.StorageBrowserRepository
+import com.dynamicframe.domain.repository.ImageCacheRepository
 import com.dynamicframe.domain.repository.MediaRepository
 import com.dynamicframe.domain.repository.MusicRepository
 import com.dynamicframe.domain.repository.SettingsRepository
