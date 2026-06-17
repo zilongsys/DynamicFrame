@@ -10,7 +10,9 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.usecase.PauseAppPlaybackUseCase
+import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.presentation.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
@@ -19,6 +21,7 @@ import javax.inject.Inject
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var pauseAppPlayback: PauseAppPlaybackUseCase
+    @Inject lateinit var debugLogger: AppDebugLogger
 
     val isTV: Boolean
         get() {
@@ -39,15 +42,18 @@ class MainActivity : ComponentActivity() {
         setContent {
             AppRoot(isTV = isTV)
         }
+        debugLogger.i("Lifecycle", "MainActivity onCreate (tv=$isTV)")
     }
 
     override fun onStop() {
         super.onStop()
+        debugLogger.i("Lifecycle", "MainActivity onStop → pauseAll")
         pauseAppPlayback.pauseAll()
     }
 
     override fun onDestroy() {
         if (isFinishing) {
+            debugLogger.i("Lifecycle", "MainActivity onDestroy → disconnectAll")
             pauseAppPlayback.disconnectAll()
         }
         super.onDestroy()

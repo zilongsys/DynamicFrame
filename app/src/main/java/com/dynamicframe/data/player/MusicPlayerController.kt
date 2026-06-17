@@ -10,6 +10,7 @@ import androidx.media3.session.SessionToken
 import com.dynamicframe.domain.model.MusicPlayerState
 import com.dynamicframe.domain.model.MusicTrack
 import com.dynamicframe.domain.model.VideoMusicBehavior
+import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.repository.MusicPlaybackRepository
 import com.google.common.util.concurrent.ListenableFuture
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -24,7 +25,8 @@ import javax.inject.Singleton
 
 @Singleton
 class MusicPlayerController @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val debug: AppDebugLogger
 ) : MusicPlaybackRepository {
     private var controller: MediaController? = null
     private var controllerFuture: ListenableFuture<MediaController>? = null
@@ -77,16 +79,19 @@ class MusicPlayerController @Inject constructor(
                     syncState()
                 }
                 if (!deferred.isCompleted) deferred.complete(Unit)
+                debug.i("Music", "MediaController conectado")
             } catch (e: Exception) {
                 controller = null
                 controllerFuture = null
                 connectionDeferred = null
+                debug.e("Music", "Error al conectar MediaController", e.message)
                 if (!deferred.isCompleted) deferred.completeExceptionally(e)
             }
         }, mainExecutor)
     }
 
     override fun disconnect() {
+        debug.i("Music", "disconnect()")
         controller?.removeListener(playerListener)
         controllerFuture?.let { MediaController.releaseFuture(it) }
         controllerFuture = null
@@ -98,6 +103,7 @@ class MusicPlayerController @Inject constructor(
     }
 
     override fun setPlaylist(tracks: List<MusicTrack>, startIndex: Int, autoPlay: Boolean) {
+        debug.d("Music", "setPlaylist ${tracks.size} pistas, start=$startIndex, play=$autoPlay")
         currentPlaylist = tracks
         if (controller == null) {
             pendingPlaylist = tracks to startIndex
@@ -220,6 +226,7 @@ class MusicPlayerController @Inject constructor(
 
         override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
             updateStateOnMain {
+                debug.e("Music", "onPlayerError", error.errorCodeName)
                 if (currentPlaylist.isNotEmpty()) {
                     controller?.seekToNextMediaItem()
                     syncState()

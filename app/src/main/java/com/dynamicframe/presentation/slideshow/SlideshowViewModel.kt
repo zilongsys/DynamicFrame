@@ -11,6 +11,7 @@ import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.playback.SlideshowMusicCoordinator
 import com.dynamicframe.domain.slideshow.SlideshowEngine
+import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.usecase.DeleteMediaItemUseCase
 import com.dynamicframe.domain.usecase.EvictMediaCacheUseCase
@@ -39,7 +40,8 @@ class SlideshowViewModel @Inject constructor(
     private val preloadSlideshowImages: PreloadSlideshowImagesUseCase,
     private val updateSelectedAlbums: UpdateSelectedAlbumsUseCase,
     private val getFolderDisplayName: GetFolderDisplayNameUseCase,
-    val slideshowVideoPlayer: SlideshowVideoPlayerRepository
+    val slideshowVideoPlayer: SlideshowVideoPlayerRepository,
+    private val debug: AppDebugLogger
 ) : ViewModel() {
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
@@ -106,6 +108,7 @@ class SlideshowViewModel @Inject constructor(
     }
 
     fun startSlideshow(freshSession: Boolean = false) {
+        debug.i("UI", "startSlideshow freshSession=$freshSession")
         if (freshSession) {
             slideshowEngine.beginSession()
         } else {
@@ -154,6 +157,7 @@ class SlideshowViewModel @Inject constructor(
     }
 
     fun deleteItem(item: MediaItem) {
+        debug.w("UI", "deleteItem ${item.type} ${item.name}", item.uri)
         viewModelScope.launch {
             val wasPlaying = slideshowState.value.isPlaying
             slideshowEngine.pause()
@@ -170,6 +174,7 @@ class SlideshowViewModel @Inject constructor(
                     }
                 }
                 .onFailure { e ->
+                    debug.e("UI", "deleteItem falló", e.message)
                     _toastMessage.value = e.message ?: "No se pudo borrar el archivo"
                     slideshowEngine.loadMedia()
                     if (wasPlaying) {

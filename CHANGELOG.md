@@ -1,5 +1,13 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.32
+
+### Añadido
+- **Modo depuración**: toggle en Ajustes → Sistema; activo por defecto en builds debug.
+- Consola flotante **DBG** con log de navegación, slideshow, música, vídeo, lifecycle y errores.
+- Botones **Copiar** (portapapeles) y **Limpiar** para reportar fallos con contexto.
+- Log también en Logcat con tag `DynamicFrame`.
+
 ## v0.1.31
 
 ### Corregido (auditoría de código)

@@ -83,13 +83,15 @@ android {
     }
 
     buildTypes {
-        release {
-            isMinifyEnabled = true
-            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-        }
         debug {
             applicationIdSuffix = ".debug"
             isDebuggable = true
+            buildConfigField("boolean", "DEBUG_TOOLS_DEFAULT", "true")
+        }
+        release {
+            isMinifyEnabled = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            buildConfigField("boolean", "DEBUG_TOOLS_DEFAULT", "false")
         }
     }
 

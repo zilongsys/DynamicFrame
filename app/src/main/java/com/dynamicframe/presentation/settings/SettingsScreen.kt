@@ -63,6 +63,7 @@ fun SettingsScreen(
     onMediaChanged: () -> Unit = {}
 ) {
     val config by viewModel.config.collectAsStateWithLifecycle()
+    val debugModeEnabled by viewModel.debugModeEnabled.collectAsStateWithLifecycle()
     val albums by viewModel.albums.collectAsStateWithLifecycle()
     val device = LocalDeviceProfile.current
     val context = LocalContext.current
@@ -804,6 +805,28 @@ fun SettingsScreen(
             item {
                 Spacer(Modifier.height(8.dp))
                 SettingsSectionHeader("Sistema", Icons.Default.Settings)
+            }
+
+            item {
+                SettingsSwitchItem(
+                    title = "Modo depuración",
+                    icon = Icons.Default.BugReport,
+                    checked = debugModeEnabled,
+                    onCheckedChange = { viewModel.updateDebugMode(it) }
+                )
+            }
+
+            item {
+                Text(
+                    text = if (debugModeEnabled) {
+                        "Consola flotante DBG activa. Toca el botón morado para ver el log y copiarlo."
+                    } else {
+                        "Activa para registrar acciones, errores y navegación (útil al reportar fallos)."
+                    },
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.55f),
+                    fontSize = 12.sp,
+                    modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
+                )
             }
 
             item {

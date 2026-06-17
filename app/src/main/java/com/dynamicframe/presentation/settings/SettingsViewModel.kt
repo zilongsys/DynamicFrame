@@ -9,8 +9,10 @@ import com.dynamicframe.domain.usecase.GetFolderDisplayNameUseCase
 import com.dynamicframe.domain.usecase.GetLocalAlbumsUseCase
 import com.dynamicframe.domain.usecase.ListStorageRootsUseCase
 import com.dynamicframe.domain.usecase.ListStorageSubfoldersUseCase
+import com.dynamicframe.domain.usecase.ObserveDebugModeUseCase
 import com.dynamicframe.domain.usecase.ObserveSlideshowConfigUseCase
 import com.dynamicframe.domain.usecase.SaveSlideshowConfigUseCase
+import com.dynamicframe.domain.usecase.SetDebugModeUseCase
 import com.dynamicframe.domain.usecase.ToggleClockUseCase
 import com.dynamicframe.domain.usecase.ToggleShuffleUseCase
 import com.dynamicframe.domain.usecase.UpdateIntervalUseCase
@@ -41,11 +43,16 @@ class SettingsViewModel @Inject constructor(
     private val getLocalAlbums: GetLocalAlbumsUseCase,
     private val getFolderDisplayName: GetFolderDisplayNameUseCase,
     private val listStorageRoots: ListStorageRootsUseCase,
-    private val listStorageSubfolders: ListStorageSubfoldersUseCase
+    private val listStorageSubfolders: ListStorageSubfoldersUseCase,
+    observeDebugMode: ObserveDebugModeUseCase,
+    private val setDebugMode: SetDebugModeUseCase
 ) : ViewModel() {
 
     val config: StateFlow<SlideshowConfig> = observeConfig()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), SlideshowConfig())
+
+    val debugModeEnabled: StateFlow<Boolean> = observeDebugMode()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
     private val _albums = MutableStateFlow<List<MediaAlbum>>(emptyList())
     val albums: StateFlow<List<MediaAlbum>> = _albums.asStateFlow()
@@ -154,4 +161,8 @@ class SettingsViewModel @Inject constructor(
     fun storageRoots() = listStorageRoots()
 
     fun storageSubfolders(folderUri: String) = listStorageSubfolders(folderUri)
+
+    fun updateDebugMode(enabled: Boolean) {
+        viewModelScope.launch { setDebugMode(enabled) }
+    }
 }

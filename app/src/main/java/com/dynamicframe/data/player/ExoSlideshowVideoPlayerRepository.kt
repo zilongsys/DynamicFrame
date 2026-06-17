@@ -5,12 +5,14 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
+import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
 
 class ExoSlideshowVideoPlayerRepository @Inject constructor(
-    @ApplicationContext private val context: Context
+    @ApplicationContext private val context: Context,
+    private val debug: AppDebugLogger
 ) : SlideshowVideoPlayerRepository {
 
     private var exoPlayer: ExoPlayer? = null
@@ -26,6 +28,7 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
     }
 
     override fun prepare(uri: String, volume: Float, mute: Boolean, playing: Boolean) {
+        debug.d("Video", "prepare playing=$playing mute=$mute uri=${uri.takeLast(48)}")
         runCatching {
             val p = obtainPlayer()
             p.stop()
@@ -35,6 +38,7 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
             p.prepare()
             if (playing) p.play() else p.pause()
         }.onFailure {
+            debug.e("Video", "prepare falló", it.message)
             onError?.invoke()
         }
     }
@@ -52,6 +56,7 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
             }
 
             override fun onPlayerError(error: PlaybackException) {
+                debug.e("Video", "onPlayerError", error.errorCodeName)
                 this@ExoSlideshowVideoPlayerRepository.onError?.invoke()
             }
         }

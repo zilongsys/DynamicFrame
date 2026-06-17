@@ -12,10 +12,12 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dynamicframe.domain.model.hasCustomMediaFolders
 import kotlinx.coroutines.delay
 import androidx.compose.runtime.LaunchedEffect
+import androidx.navigation.NavController
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.dynamicframe.presentation.debug.DebugViewModel
 import com.dynamicframe.presentation.home.HomeScreen
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
 import com.dynamicframe.presentation.permissions.MediaPermissionState
@@ -35,6 +37,7 @@ sealed class Screen(val route: String) {
 @Composable
 fun DynamicFrameNavHost(
     isTV: Boolean,
+    debugViewModel: DebugViewModel,
     navController: NavHostController = rememberNavController()
 ) {
     val activity = LocalContext.current as ComponentActivity
@@ -48,6 +51,20 @@ fun DynamicFrameNavHost(
     LaunchedEffect(settingsConfig.photoFolderUris, settingsConfig.videoFolderUris) {
         val usesMediaStore = !settingsConfig.hasCustomMediaFolders()
         mediaPermissionDenied = usesMediaStore && hasMissingMediaPermissions(activity)
+    }
+
+    LaunchedEffect(mediaPermissionDenied) {
+        if (mediaPermissionDenied) {
+            debugViewModel.logWarn("Permisos", "Falta acceso a fotos/vídeos (MediaStore)")
+        }
+    }
+
+    LaunchedEffect(navController) {
+        val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
+            debugViewModel.logInfo("Nav", "→ ${destination.route ?: "?"}")
+        }
+        navController.addOnDestinationChangedListener(listener)
+        onDispose { navController.removeOnDestinationChangedListener(listener) }
     }
 
     var fullscreenNavLocked by remember { mutableStateOf(false) }

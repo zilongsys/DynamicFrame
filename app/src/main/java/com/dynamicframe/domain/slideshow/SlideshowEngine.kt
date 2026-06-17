@@ -4,6 +4,7 @@ import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.SlideshowState
+import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.usecase.GetSlideshowItemsUseCase
 import com.dynamicframe.domain.usecase.ObserveSlideshowConfigUseCase
 import kotlinx.coroutines.*
@@ -16,7 +17,8 @@ import javax.inject.Singleton
 @Singleton
 class SlideshowEngine @Inject constructor(
     private val getSlideshowItems: GetSlideshowItemsUseCase,
-    private val observeConfig: ObserveSlideshowConfigUseCase
+    private val observeConfig: ObserveSlideshowConfigUseCase,
+    private val debug: AppDebugLogger
 ) {
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private val loadMutex = Mutex()
@@ -70,6 +72,7 @@ class SlideshowEngine @Inject constructor(
     }
 
     suspend fun loadMedia() = loadMutex.withLock {
+        debug.d("Slideshow", "loadMedia() iniciado")
         val previous = _state.value
         val result = withContext(Dispatchers.IO) { getSlideshowItems() }
         withContext(Dispatchers.Main.immediate) {
@@ -79,6 +82,7 @@ class SlideshowEngine @Inject constructor(
 
                 if (shuffledItems.isEmpty()) {
                     timerJob?.cancel()
+                    debug.w("Slideshow", "loadMedia: sin medios")
                     _state.value = previous.copy(
                         totalItems = 0,
                         allItems = emptyList(),
@@ -111,7 +115,9 @@ class SlideshowEngine @Inject constructor(
                 )
                 preloadNext(newIndex)
                 if (_state.value.isPlaying) scheduleNext()
+                debug.i("Slideshow", "loadMedia OK: ${items.size} medios, índice $newIndex")
             }.onFailure { e ->
+                debug.e("Slideshow", "loadMedia falló", e.message)
                 _state.value = previous.copy(error = e.message ?: "Error al cargar medios")
             }
         }
@@ -141,6 +147,7 @@ class SlideshowEngine @Inject constructor(
         timerJob?.cancel()
         transitionJob?.cancel()
         if (mediaItems.isEmpty()) {
+            debug.w("Slideshow", "beginSession: playlist vacía")
             _state.value = _state.value.copy(
                 isPlaying = false,
                 error = "No hay fotos o videos. Configura carpetas en Ajustes."
@@ -164,6 +171,7 @@ class SlideshowEngine @Inject constructor(
         )
         preloadNext(startIndex)
         scheduleNext()
+        debug.i("Slideshow", "beginSession índice=$startIndex tipo=${item.type}")
     }
 
     fun pause() {
@@ -249,6 +257,7 @@ class SlideshowEngine @Inject constructor(
     /** Error de reproducción o carga: saltar al siguiente medio sin detener el slideshow. */
     fun onPlaybackError() {
         if (!_state.value.isPlaying) return
+        debug.w("Slideshow", "onPlaybackError → saltar", _state.value.currentItem?.uri)
         skipToNextOrPause()
     }
 
@@ -282,6 +291,7 @@ class SlideshowEngine @Inject constructor(
         val safeIndex = index.coerceIn(0, shuffledItems.lastIndex)
         val item = shuffledItems[safeIndex]
         val nextIdx = (safeIndex + 1) % shuffledItems.size
+        debug.d("Slideshow", "navigateTo $safeIndex/${shuffledItems.lastIndex} ${item.type} ${item.name}")
 
         _state.value = _state.value.copy(
             currentIndex = safeIndex,
