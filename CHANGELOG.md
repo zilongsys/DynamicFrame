@@ -1,5 +1,11 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.30
+
+### Corregido
+- `MusicPlayerController.skipNext()`: tipo de retorno `Unit` (no el nullable de `seekToNextMediaItem`).
+- `FolderBrowserDialog` de música en `HomeScreen`: parámetros `listRoots` / `listSubfolders`.
+
 ## v0.1.29
 
 ### Corregido

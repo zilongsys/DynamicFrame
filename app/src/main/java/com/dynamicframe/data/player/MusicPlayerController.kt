@@ -138,7 +138,10 @@ class MusicPlayerController @Inject constructor(
         _state.value = _state.value.copy(isPlaying = false)
     }
 
-    override fun skipNext() = controller?.seekToNextMediaItem()
+    override fun skipNext() {
+        controller?.seekToNextMediaItem()
+    }
+
     fun skipPrevious() = controller?.seekToPreviousMediaItem()
 
     override fun setVolume(volume: Float) {

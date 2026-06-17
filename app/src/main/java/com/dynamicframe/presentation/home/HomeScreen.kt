@@ -932,7 +932,9 @@ private fun MusicPanel(
                 onUpdateConfig(config.copy(musicFolderUris = config.musicFolderUris + uri))
             }
             showMusicFolderBrowser = false
-        }
+        },
+        listRoots = settingsViewModel::storageRoots,
+        listSubfolders = settingsViewModel::storageSubfolders
     )
 
     LazyColumn(
