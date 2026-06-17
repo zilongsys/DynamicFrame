@@ -6,7 +6,6 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.preferencesDataStore
 import com.dynamicframe.BuildConfig
-import com.dynamicframe.data.local.SlideshowPreferencesKeys
 import com.dynamicframe.domain.debug.DebugLevel
 import com.dynamicframe.domain.debug.DebugLogEntry
 import com.dynamicframe.domain.repository.AppDebugLogger
@@ -28,7 +27,7 @@ import javax.inject.Inject
 import javax.inject.Singleton
 
 private val Context.debugPrefsDataStore by preferencesDataStore(
-    name = SlideshowPreferencesKeys.DATASTORE_FILE
+    name = "app_debug"
 )
 
 private val DEBUG_MODE = booleanPreferencesKey("debug_mode")

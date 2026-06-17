@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.35
+
+### Corregido
+- Crash al añadir carpeta: `AndroidAppDebugLogger` y `DataStoreSettingsRepository` abrían el mismo archivo DataStore (`slideshow_settings`).
+
 ## v0.1.34
 
 ### Corregido
