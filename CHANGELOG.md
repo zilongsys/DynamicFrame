@@ -1,5 +1,11 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.37
+
+### Corregido
+- Hoja de ruta: el listado no hacía scroll porque `LazyColumn` no tenía altura acotada. Aplicado `Modifier.fillMaxSize()` / `weight(1f)` según contexto.
+- Hoja de ruta en TV: ítems ahora son focusables con D-pad para desplazamiento correcto.
+
 ## v0.1.36
 
 ### Corregido

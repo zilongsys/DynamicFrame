@@ -1,17 +1,22 @@
 package com.dynamicframe.presentation.home
 
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -99,27 +104,52 @@ fun ComingSoonPanel(feature: RoadmapFeature) {
             lineHeight = 22.sp
         )
         Spacer(Modifier.height(24.dp))
-        FeatureCatalogSection(filterCategory = null, highlight = feature.title)
+        // weight(1f) acota la altura para que LazyColumn pueda hacer scroll
+        FeatureCatalogSection(
+            filterCategory = null,
+            highlight = feature.title,
+            modifier = Modifier.weight(1f)
+        )
     }
 }
 
 @Composable
 fun FeatureCatalogPanel() {
-    FeatureCatalogSection(filterCategory = null, highlight = null)
+    FeatureCatalogSection(
+        filterCategory = null,
+        highlight = null,
+        modifier = Modifier.fillMaxSize()
+    )
 }
 
 @Composable
-private fun FeatureCatalogSection(filterCategory: String?, highlight: String?) {
-    val items = memoriaFeatureCatalog.filter { filterCategory == null || it.category == filterCategory }
+private fun FeatureCatalogSection(
+    filterCategory: String?,
+    highlight: String?,
+    modifier: Modifier = Modifier
+) {
+    val catalogItems = memoriaFeatureCatalog.filter { filterCategory == null || it.category == filterCategory }
     val device = LocalDeviceProfile.current
+    val listState = rememberLazyListState()
+
     LazyColumn(
-        modifier = if (device.isTv) Modifier.focusGroup() else Modifier,
+        state = listState,
+        modifier = modifier
+            .then(if (device.isTv) Modifier.focusGroup() else Modifier),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        items(items, key = { "${it.category}_${it.name}" }) { item ->
+        items(catalogItems, key = { "${it.category}_${it.name}" }) { item ->
             val emphasized = highlight != null && item.name.contains(highlight, ignoreCase = true)
+            val focusRequester = remember { FocusRequester() }
             Surface(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .then(
+                        if (device.isTv) Modifier
+                            .focusRequester(focusRequester)
+                            .focusable()
+                        else Modifier
+                    ),
                 shape = RoundedCornerShape(12.dp),
                 color = if (emphasized) MemoriaPurpleSoft else MemoriaSurface,
                 border = androidx.compose.foundation.BorderStroke(1.dp, MemoriaLine)
