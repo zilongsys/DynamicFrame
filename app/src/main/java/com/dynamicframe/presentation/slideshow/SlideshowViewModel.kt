@@ -3,6 +3,7 @@ package com.dynamicframe.presentation.slideshow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.dynamicframe.domain.model.MediaAlbum
+import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.domain.model.photoFolderPillId
 import com.dynamicframe.domain.model.videoFolderPillId
 import com.dynamicframe.domain.model.MediaType

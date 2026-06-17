@@ -17,6 +17,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.presentation.debug.DebugViewModel
 import com.dynamicframe.presentation.home.HomeScreen
 import com.dynamicframe.presentation.permissions.MediaPermissionKind
