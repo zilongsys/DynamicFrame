@@ -9,6 +9,10 @@ Para versiones publicadas ver `CHANGELOG.md`.
 - Estado: Completado (v0.1.38)
 - Descripción: Pantalla incompleta arriba corregida; botón duplicado eliminado; notas por control añadidas (foco en TV); secciones reorganizadas; música aleatoria reubicada.
 
+## 2026-06-17 — Hoja de ruta scroll, filtro, foco; Preferencias FolderChip, ruta, reorg
+- Estado: Completado (v0.1.39)
+- Descripción: Scrollbar + filtro por estado en hoja de ruta; restauración de foco estilo Netflix; FolderChip con ruta completa y focusable en TV; Preferencias reorganizadas por tipo de contenido; versión al final.
+
 ## 2026-06-17 — Regla tracklist automático
 - Estado: Completado
 - Descripción: Regla .cursor/rules/change-tracklist.mdc creada. TRACKLIST.md como historial de peticiones del usuario.

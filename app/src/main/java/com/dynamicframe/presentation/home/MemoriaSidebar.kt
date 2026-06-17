@@ -43,12 +43,22 @@ fun MemoriaSidebar(
 ) {
     val device = LocalDeviceProfile.current
     val firstFocus = remember { FocusRequester() }
-    var firstFocused by remember { mutableStateOf(true) }
+    val selectedFocus = remember { FocusRequester() }
+    var initialized by remember { mutableStateOf(false) }
 
     LaunchedEffect(device.isTv) {
         if (device.isTv) {
             delay(300)
             firstFocus.requestFocusWhenReady()
+            initialized = true
+        }
+    }
+
+    // Restaura el foco al item seleccionado cuando se vuelve al sidebar (estilo Netflix)
+    LaunchedEffect(selected) {
+        if (device.isTv && initialized) {
+            delay(80)
+            runCatching { selectedFocus.requestFocus() }
         }
     }
 
@@ -97,7 +107,7 @@ fun MemoriaSidebar(
             )
             val entries = memoriaSidebarEntries.filter { it.group == group }
             entries.forEachIndexed { index, entry ->
-                val isFirst = firstFocused && index == 0 && group == RoadmapGroup.BIBLIOTECA
+                val isFirst = index == 0 && group == RoadmapGroup.BIBLIOTECA
                 val isSelected = destinationEquals(selected, entry.destination)
                 val badge = if (entry.destination is MemoriaDestination.AlbumActive && photoCount > 0) {
                     photoCount.toString()
@@ -109,7 +119,11 @@ fun MemoriaSidebar(
                     selected = isSelected,
                     badge = badge,
                     onClick = { onSelect(entry.destination) },
-                    modifier = if (isFirst && device.isTv) Modifier.tvFocusRequester(firstFocus) else Modifier
+                    modifier = when {
+                        isSelected && device.isTv -> Modifier.tvFocusRequester(selectedFocus)
+                        isFirst && device.isTv -> Modifier.tvFocusRequester(firstFocus)
+                        else -> Modifier
+                    }
                 )
                 Spacer(Modifier.height(4.dp))
             }

@@ -196,6 +196,7 @@ fun HomeScreen(
                             horizontal = device.contentPaddingH,
                             vertical = device.contentPaddingV
                         )
+                        .then(if (device.isTv) Modifier.focusGroup() else Modifier)
                 ) {
                     mainContent()
                 }

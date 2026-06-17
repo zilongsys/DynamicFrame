@@ -1,5 +1,20 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.39
+
+### Añadido
+- Hoja de ruta: barra de desplazamiento vertical, chips de filtro por estado (Todos / Listo / Parcial / Próximamente), highlight con borde morado al enfocar ítems con D-pad.
+- Foco estilo Netflix: al volver al sidebar, el foco se restaura automáticamente sobre el ítem seleccionado.
+- `focusGroup()` en el panel de contenido de HomeScreen para restauración bidireccional de foco.
+
+### Corregido
+- Preferencias: `FolderChip` en TV es ahora una fila completa focusable (OK = quitar); en móvil mantiene el botón de papelera.
+- Preferencias: muestra la ruta completa de cada carpeta debajo del nombre.
+- Preferencias: secciones reorganizadas por tipo de contenido: Fotos → Videos → Slideshow → Música → Visual → Reloj → Pantalla TV → Sistema.
+- Preferencias: "Usar galería del dispositivo" movida dentro de la sección Fotos.
+- Preferencias: versión de app al final, no focusable, solo informativa.
+- Preferencias: Spacer explícito como primer ítem para evitar recorte del texto superior.
+
 ## v0.1.38
 
 ### Corregido
