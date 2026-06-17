@@ -12,7 +12,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
 import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.usecase.PauseAppPlaybackUseCase
-import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.presentation.AppRoot
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject

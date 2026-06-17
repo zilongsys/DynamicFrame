@@ -1,5 +1,11 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.34
+
+### Corregido
+- Compilación: import duplicado de `AppDebugLogger` en `MainActivity`.
+- Compilación: listener de navegación usa `DisposableEffect` en lugar de `LaunchedEffect` + `onDispose`.
+
 ## v0.1.33
 
 ### Corregido

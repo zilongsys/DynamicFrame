@@ -2,6 +2,7 @@ package com.dynamicframe.presentation
 
 import androidx.activity.ComponentActivity
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -59,7 +60,7 @@ fun DynamicFrameNavHost(
         }
     }
 
-    LaunchedEffect(navController) {
+    DisposableEffect(navController) {
         val listener = NavController.OnDestinationChangedListener { _, destination, _ ->
             debugViewModel.logInfo("Nav", "→ ${destination.route ?: "?"}")
         }
