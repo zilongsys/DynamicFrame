@@ -1,5 +1,20 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.38
+
+### Corregido
+- Pantalla Ajustes: título "Ajustes" recortado en la parte superior (contentPadding top = 0).
+- Pantalla Ajustes: botón duplicado "Selector del sistema (fotos)" eliminado.
+
+### Añadido
+- Notas descriptivas en cada control de Ajustes: en TV aparecen al recibir foco; en móvil siempre visibles.
+- Múscia aleatoria reubicada al inicio de la sección Música para mayor visibilidad.
+
+### Actualizado
+- Secciones de Ajustes reorganizadas: Contenido → Slideshow → Visual → Reloj → Música → Videos → Pantalla TV → Sistema.
+- Fotos/videos aleatorios y Bucle movidos a la sección Slideshow (era "Modo reproducción").
+- `SettingsSwitchItem`: comparte `InteractionSource` con `safeClickable` para detectar foco correctamente.
+
 ## v0.1.37
 
 ### Corregido

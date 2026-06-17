@@ -1,0 +1,19 @@
+---
+description: Registra automáticamente cada petición de cambio en TRACKLIST.md
+alwaysApply: true
+---
+
+# Tracklist de cambios — DynamicFrame
+
+En **cada respuesta** que incluya un cambio de código:
+
+1. Abre `TRACKLIST.md` en la raíz del repo.
+2. Si no existe, créalo con la cabecera `# DynamicFrame — Tracklist de peticiones`.
+3. Añade al inicio (orden descendente) una nueva entrada con:
+   ```
+   ## YYYY-MM-DD — <nombre corto del cambio>
+   - Estado: Pendiente | Completado | Parcial
+   - Descripción: <una línea>
+   ```
+4. Si una petición anterior queda resuelta en el commit actual, actualiza su `Estado`.
+5. **No** repitas en TRACKLIST lo que ya está en CHANGELOG (CHANGELOG = versiones; TRACKLIST = historial de peticiones del usuario).
