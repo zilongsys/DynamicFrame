@@ -1,0 +1,41 @@
+---
+description: Reglas de estructura y UX para la pantalla Preferencias / Ajustes
+alwaysApply: true
+---
+
+# Pantalla Preferencias — Reglas
+
+## Orden de secciones (nunca cambiar sin motivo)
+
+1. **Contenido** — carpetas fotos/videos, galería, filtro, álbumes
+2. **Slideshow** — intervalo, transición, duración, shuffle fotos/videos, bucle
+3. **Visual en reproducción** — marco, zoom, fondo letterbox, borde zona segura, inmersivo, reloj/controles al reproducir
+4. **Reloj y fecha** — reloj principal, fecha, posición
+5. **Música de fondo** — fuente, volumen, aleatoria, carpeta/tema/URL según fuente
+6. **Videos** — silenciar, reproducir completo, música durante video
+7. **Pantalla TV** — solo flavor TV (borde pantalla, zoom UI)
+8. **Sistema** — depuración, versión, arranque automático
+
+## Reglas de contenido
+
+- Cada control (`SettingsSwitchItem`, `SettingsSliderItem`, `SettingsDropdownItem`) **debe** tener `note = "…"` con una descripción corta de para qué sirve.
+- En TV: la nota se muestra solo cuando el ítem tiene el foco (`collectIsFocusedAsState`).
+- En móvil: la nota se muestra siempre debajo del control.
+- `contentPadding` del LazyColumn debe tener `top >= 12.dp` siempre (evita recorte del primer ítem).
+- **Nunca** dos botones que hacen la misma acción en la misma pantalla. El bloque "Selector del sistema (fotos)" fue eliminado por duplicar "Añadir carpeta de fotos".
+
+## Navegación TV (D-pad)
+
+- Todos los controles clicables usan `safeClickable` (que internamente llama a `tvClickable` con `focusable()`).
+- `SettingsSwitchItem` comparte el `MutableInteractionSource` entre `safeClickable` y la nota para detectar foco.
+- El LazyColumn de ajustes usa `Modifier.focusGroup()` en TV.
+- No mezclar ítems dentro del mismo `item { }` si son controles independientes: cada control en su propio `item { }`.
+
+## Añadir un control nuevo
+
+1. Elegir la sección correcta según la tabla de orden.
+2. Usar el componente adecuado: switch → `SettingsSwitchItem`, slider → `SettingsSliderItem`, selector → `SettingsDropdownItem`.
+3. Añadir `note = "…"` descriptivo.
+4. Añadir la clave en `SlideshowPreferencesKeys` y persistir en `DataStoreSettingsRepository.saveConfig`.
+5. Añadir el campo en `SlideshowConfig` con valor por defecto sensato.
+6. Exponer un método en `SettingsViewModel` si la acción es específica (no usar `saveConfig` entero).
