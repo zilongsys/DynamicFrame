@@ -982,7 +982,7 @@ private fun MusicPanel(
                     }
                 )
             }
-            items(config.musicFolderUris) { uri ->
+            items(config.musicFolderUris, key = { "music:$it" }) { uri ->
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()

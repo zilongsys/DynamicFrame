@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.33
+
+### Corregido
+- Crash en Ajustes al desplazarse: claves duplicadas en `LazyColumn` cuando la misma carpeta estaba en fotos y vídeos.
+
 ## v0.1.32
 
 ### Añadido

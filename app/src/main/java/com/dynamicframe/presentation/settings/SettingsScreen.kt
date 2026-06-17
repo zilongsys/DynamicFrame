@@ -490,7 +490,7 @@ fun SettingsScreen(
                 )
             }
 
-            items(config.photoFolderUris, key = { it }) { uri ->
+            items(config.photoFolderUris, key = { "photo:$it" }) { uri ->
                 FolderChip(
                     label = viewModel.folderLabel(uri),
                     onRemove = {
@@ -516,7 +516,7 @@ fun SettingsScreen(
                 )
             }
 
-            items(config.videoFolderUris, key = { it }) { uri ->
+            items(config.videoFolderUris, key = { "video:$it" }) { uri ->
                 FolderChip(
                     label = viewModel.folderLabel(uri),
                     onRemove = {
@@ -633,7 +633,7 @@ fun SettingsScreen(
                         onClick = { openFolderPicker(FolderTarget.MUSIC, requestMusicAccess) }
                     )
                 }
-                items(config.musicFolderUris, key = { it }) { uri ->
+                items(config.musicFolderUris, key = { "music:$it" }) { uri ->
                     FolderChip(
                         label = viewModel.folderLabel(uri),
                         onRemove = { viewModel.removeMusicFolder(uri) }
