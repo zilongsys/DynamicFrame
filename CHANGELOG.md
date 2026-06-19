@@ -1,5 +1,122 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.53
+
+### Corregido
+- **Vídeo — flash negro al cambiar de vídeo**: el reproductor de vídeo (`SlideshowVideoPlayer`) se extrajo de `AnimatedContent` y se monta directamente cuando el ítem actual es vídeo. Al navegar de un vídeo a otro el composable no se recrea: solo cambian `uri` y `playToken`, lo que dispara `prepare()` internamente sin destruir/crear el reproductor. El shutter de `PlayerView` pasa a ser transparente (antes negro), de modo que mientras carga el nuevo vídeo se ve el fondo configurado (letterbox) en vez de negro. Efecto combinado: transiciones vídeo→vídeo sin flash negro.
+- **Vídeo — primer frame con distorsión**: se añade un fade-in de 280 ms sobre el `PlayerView` desde alpha 0 hasta 1 cuando llega el primer frame (`onRenderedFirstFrame`). Esto oculta el encuadre provisional que ExoPlayer/SurfaceView calcula antes de conocer las dimensiones reales del vídeo, y la imagen aparece siempre correctamente encuadrada.
+
+### Añadido
+- **Reproducción — volumen de vídeo independiente**: nueva fila de control en el panel inferior del slideshow (aparece solo cuando el elemento actual es un vídeo y el audio no está silenciado). En TV usa `TvVolumeStepper` igual que la música; en móvil usa un `Slider`. Modifica `SlideshowConfig.mediaVolume` en tiempo real a través de `UpdateSlideshowConfigUseCase`.
+
+### Hoja de ruta — scroll sin salto
+- **Hoja de ruta — efecto de salto al navegar entre ítems**: eliminado `BringIntoViewSpec` personalizado (causaba conflictos con el sistema de foco nativo de TV produciendo doble-scroll). Sustituido por scroll controlado: cada ítem notifica su índice al ganar foco (`onFocusChanged`) y un `LaunchedEffect` llama a `animateScrollToItem` solo cuando el ítem no es visible, sin interferir con la navegación D-pad normal.
+
+## v0.1.52
+
+### Corregido
+- **Vídeo — se quedaba "pausado" al terminar (causa real)**: el callback de fin de vídeo se registraba con `setListeners` dentro de un `DisposableEffect` cuyas claves eran lambdas que cambiaban de identidad en cada recomposición, lo que provocaba re-registros y una ventana en la que el evento `STATE_ENDED` podía perderse. Con "mostrar vídeo completo" no hay temporizador de respaldo, así que el vídeo quedaba congelado para siempre. Ahora el reproductor usa un **único listener estable** (registrado una sola vez con `rememberUpdatedState` para los callbacks) que captura fin de vídeo, errores y tamaño del vídeo; el avance/repetición al terminar es fiable.
+- **Imagen de fondo persistente tras el vídeo**: la capa "underlay" (foto previa, usada para fundidos suaves entre fotos) se seguía dibujando detrás del vídeo, mostrándose en las barras del letterbox. Ahora solo se dibuja cuando el elemento actual es una imagen y se limpia al pasar a vídeo: el vídeo se muestra sobre el fondo de reproducción (negro/desenfoque), no sobre la foto.
+
+## v0.1.51
+
+### Corregido
+- **Vídeo — al terminar se quedaba "pausado" en vez de avanzar/repetir**: cuando un vídeo terminaba y el motor navegaba al MISMO elemento (bucle con un único vídeo, o navegar al mismo `id`), el reproductor no se recomponía (misma URI en `AnimatedContent`), así que no volvía a `prepare()` y el vídeo quedaba congelado en su último frame. Se añade un `playToken` en `SlideshowState` que se incrementa en cada navegación; el reproductor de vídeo re-prepara al cambiar la URI **o** el `playToken`, de modo que un vídeo se reinicia de forma determinista aunque sea el mismo. Para listas con varios elementos el avance ya funcionaba y se mantiene.
+
+### Verificado
+- **Aleatorios (fotos, vídeos, música)**: fotos y vídeos se barajan por tipo en `buildPlaylist` (cada sesión vuelve a barajar y `beginSession` arranca en un índice aleatorio); la música se baraja antes de reproducir (v0.1.49) y suena en bucle (`REPEAT_MODE_ALL`). Comportamiento de duración de vídeo confirmado: con "mostrar vídeo completo" se reproduce entero y luego avanza; sin esa opción usa el intervalo de las fotos.
+
+## v0.1.50
+
+### Corregido
+- **Vídeo — pantalla en negro al pausar y reanudar (solo vídeos)**: la v0.1.49 cambió el reproductor a `TextureView`, que tiene un problema conocido de ciclo de vida (se queda en negro al reanudar). Se vuelve a `SurfaceView` (recomendado para vídeo en Android TV) y la distorsión inicial que motivó el cambio se corrige ahora forzando un re-layout cuando llega el tamaño del vídeo / se pinta el primer frame (`onVideoSizeChanged` / `onRenderedFirstFrame`), además de `keepContentOnPlayerReset` para evitar parpadeos a negro al re-preparar.
+- **Vídeo — transición vídeo→vídeo cortaba el siguiente**: al desmontar un slide de vídeo se llamaba a `stop()` incondicional, que podía detener el vídeo ya cargado por el slide siguiente. Ahora se usa `stopIfCurrent(uri)`: solo detiene si el vídeo cargado sigue siendo el de ese slide.
+
+## v0.1.49
+
+### Corregido
+- **Música — el aleatorio empezaba siempre por la misma canción**: el shuffle se delegaba en ExoPlayer (`shuffleModeEnabled`), que solo afecta al "siguiente": la reproducción siempre arrancaba en el índice fijo de la lista. Ahora, si el aleatorio está activo, la lista de pistas se **baraja antes de reproducir** y se reproduce en ese orden, por lo que cada sesión empieza por una canción distinta. La detección de "lista obsoleta" pasa a comparar por conjunto de ids (no por orden) para que la lista ya barajada no se reinicie en cada chequeo.
+- **Vídeo — se mostraba distorsionado hasta pausar/reanudar**: el `PlayerView` usaba `SurfaceView`, que no se puede transformar ni mezclar por alpha durante las transiciones del slideshow (`AnimatedContent`), por lo que el vídeo aparecía estirado hasta forzar un re-render. Ahora el reproductor usa `TextureView` (layout `slideshow_player_view.xml`) y se adjunta al crearse, de modo que el vídeo se muestra completo en su resolución (`RESIZE_MODE_FIT`, sin recortar) y correcto desde el primer frame, igual que las fotos.
+
+## v0.1.48
+
+### Corregido
+- **Preferencias — carpetas mezcladas entre fotos y vídeos**: con la lista de vídeos vacía, la sección de vídeos mostraba las carpetas de fotos (y viceversa). La causa era el fallback a la clave legacy combinada `MEDIA_FOLDERS`, que se reescribe en cada guardado. Ahora solo se migra desde esa clave cuando la clave específica nunca se guardó (config antigua); una lista vacía ya no se rellena con la de la otra sección.
+
+### Actualizado
+- **Preferencias — orden de secciones**: "Música de fondo" ahora aparece justo después de "Videos" (Fotos → Videos → Música de fondo → Slideshow → Visual…).
+
+## v0.1.47
+
+### Corregido
+- **Hoja de ruta — scroll ágil**: la animación de auto-scroll por foco se redujo de 260 ms a 90 ms. Antes la fila se "revelaba lentamente" y al subir/bajar rápido se notaba retardo; ahora responde al instante manteniendo la suavidad.
+- **Chips de filtro — foco visible sobre el activo**: cuando el foco cae sobre un chip ya activo (violeta) no había forma de saber que estabas sobre él. Ahora todo chip enfocado muestra un anillo blanco de 2 dp, así se distingue siempre cuál está bajo el foco (activo o no).
+
+## v0.1.46
+
+### Corregido
+- **Hoja de ruta — fin del "brinco" al desplazar**: el auto-scroll por foco usaba una animación tipo muelle (spring) que se sentía como un salto. Ahora se usa un `BringIntoViewSpec` propio que mantiene el desplazamiento mínimo (las filas ya visibles no se mueven y el D-pad sigue llegando a las de abajo) pero con una animación suave (tween), logrando un scroll natural como el de una lista normal.
+
+## v0.1.45
+
+### Corregido
+- **Hoja de ruta — scroll natural (sin salto por línea)**: el espaciado entre filas se pasó de `Arrangement.spacedBy` + `contentPadding` a un **margen dentro de cada fila, fuera del área enfocable**. Así el auto-scroll por foco (bring-into-view) no sobre-desplaza y la lista se mueve de forma fluida, como una lista normal.
+- **Hoja de ruta — primera fila al entrar (robusto)**: en lugar de la API experimental que provocaba crash, ahora se detecta cuándo la lista gana el foco (`onFocusChanged`) y se posiciona/enfoca la primera fila de forma segura. Entrar en la lista siempre marca la línea 1.
+
+## v0.1.44
+
+### Corregido
+- **Crash al navegar la hoja de ruta**: se eliminó `focusProperties { enter }` (API experimental) que devolvía un `FocusRequester` no adjunto cuando la primera fila no estaba compuesta, cerrando la app. El foco inicial en la primera fila se mantiene de forma segura.
+- **Salto constante al desplazar la lista**: `allItems` no estaba memoizado, así que se recreaba en cada recomposición y reiniciaba el `LaunchedEffect` que hacía `scrollToItem(0)`. Ahora está memoizado por categoría y el reposicionado al inicio solo ocurre al cambiar de filtro.
+- **Foco al salir con IZQUIERDA**: ahora vuelve siempre al item del menú de la sección actual usando `focusProperties { exit }` (la API correcta para redirigir la salida de un `focusGroup`), en lugar de `left` que no se aplicaba al grupo y dejaba el foco en otra sección.
+
+## v0.1.43
+
+### Corregido
+- **Hoja de ruta — sin "brinco" al desplazar**: la altura de cada fila ya no cambia al enfocar (peso de fuente constante y `maxLines` con elipsis), eliminando el salto al subir/bajar.
+- **Hoja de ruta — foco en la primera fila al entrar**: además del foco inicial, la lista usa `focusProperties { enter }` para que al entrar (D-pad) el foco caiga siempre en la primera fila.
+
+### Actualizado
+- **Chips de filtro (Todos / Listo / Parcial / Próximamente)**: estados visuales propios de una app moderna — **activo = violeta completo** con texto blanco; **enfocado (no activo) = gris** con texto blanco; **reposo = contorno** sobre fondo claro. Transición de color suave.
+
+## v0.1.42
+
+### Actualizado
+- **Hoja de ruta**: las filas enfocadas ahora se rellenan de **morado completo** con texto blanco (como los botones principales), en vez del fondo suave con barra lateral.
+- **Foco al entrar en la hoja de ruta**: cae siempre en la **primera fila** (scroll al inicio) para un flujo orgánico.
+- **Foco al salir de la lista** (D-pad izquierda): vuelve al ítem seleccionado del menú lateral (p. ej. "Hoja de ruta"), no a otra sección. Se comparte el `FocusRequester` del item seleccionado y el contenido usa `focusProperties { left = ... }`.
+- **Botones de toda la app**: al enfocar se rellenan de **morado completo** con contenido blanco (consistencia global): `NostalgiaActionButton`, `DeviceActionButton`, `TvPickerChip`, `TvStepperChip` y los ítems del menú lateral.
+
+### Añadido
+- `safeClickable` / `tvClickable`: parámetro `focusScale` para que un botón pueda dibujar su propio relleno de foco sin borde ni escalado.
+
+## v0.1.41
+
+Auditoría completa del proyecto: corrección de errores críticos, lógicos y mejoras visuales/técnicas.
+
+### Corregido
+- **Carpetas desactivadas ahora se excluyen de verdad**: `GetSlideshowItemsUseCase`, `GetMusicTracksUseCase`, `hasCustomMediaFolders()`, las píldoras de álbum y la `mediaKey` del `SlideshowEngine` usan `activePhotoFolderUris()` / `activeVideoFolderUris()` / `activeMusicFolderUris()`. Si se desactivan todas las carpetas, vuelve a la galería del dispositivo.
+- **Vídeo seguía sonando/reproduciéndose al pasar a una foto**: el `SlideshowVideoPlayer` llama a `stop()` al desmontar el slide de vídeo y libera el `PlayerView`.
+- **La pausa reiniciaba el vídeo**: separado `prepare()` (solo al cambiar de URI) de play/pausa y volumen, que ya no recargan el medio.
+- **Música no se atenúa si el vídeo está silenciado** (`muteVideoAudio`): no tiene sentido bajar la música por un vídeo mudo.
+- **Botón de música**: ahora reproduce/pausa solo la música, sin parar el slideshow de fotos/vídeos.
+- **Bucle infinito si todos los medios fallan**: contador de errores consecutivos que pausa con mensaje claro cuando toda la lista falla.
+- **Borrado en Android 10+**: mensaje claro cuando el sistema requiere confirmación, sin crash.
+- **Condición de carrera en DataStore**: `updateConfig` se serializa por el `Mutex` del use case.
+- **Ajustes a pantalla completa**: al cambiar carpetas recarga los medios (`onMediaChanged`).
+
+### Añadido
+- **Multi-fuente de música real**: `GetMusicTracksUseCase` fusiona pistas de todas las fuentes activas (Biblioteca + Carpeta local) sin duplicados. El panel de música del Home también es multi-select.
+- **Autostart más robusto (Android TV)**: `BootReceiver` con try/catch, soporte `LOCKED_BOOT_COMPLETED` / `QUICKBOOT_POWERON`, `directBootAware`; el extra `AUTO_STARTED` ya se consume y abre el slideshow a pantalla completa al arrancar.
+- **Banner de permisos accionable**: botón "Conceder acceso" que solicita el permiso directamente (Home y Ajustes).
+- **Reproductor de vídeo** con `AudioAttributes` de película y como singleton (`@Singleton`).
+
+### Actualizado
+- **Límites de decodificación (Coil)**: miniaturas (512px) y fondo personalizado (1920×1080) acotados para evitar OOM con fotos 4K+.
+- **Hoja de ruta**: textos más grandes en TV (10-foot UI).
+- **Fuentes de música no implementadas** (Spotify/YouTube/Tema) atenuadas y deshabilitadas; `SettingsSwitchItem` admite `enabled`.
+- **Banner de permisos** unificado a la paleta Memoria.
+
 ## v0.1.40
 
 ### Añadido

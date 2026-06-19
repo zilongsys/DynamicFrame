@@ -35,6 +35,7 @@ fun SlideshowMediaViewport(
     muteVideoAudio: Boolean,
     mediaVolume: Float,
     videoPlayer: SlideshowVideoPlayerRepository,
+    playToken: Int = 0,
     onVideoEnded: () -> Unit,
     onPlaybackError: () -> Unit = onVideoEnded,
     onPreloadImages: (List<String>, Int, Int) -> Unit = { _, _, _ -> },
@@ -43,10 +44,9 @@ fun SlideshowMediaViewport(
     modifier: Modifier = Modifier
 ) {
     val decodeSize = rememberMaxDecodeSize()
+    val isVideo = currentItem.type == MediaType.VIDEO
 
-    val effectiveTransition = if (
-        currentItem.type == MediaType.VIDEO || nextItem?.type == MediaType.VIDEO
-    ) {
+    val effectiveTransition = if (isVideo || nextItem?.type == MediaType.VIDEO) {
         TransitionType.NONE
     } else {
         transitionType
@@ -54,11 +54,13 @@ fun SlideshowMediaViewport(
 
     LaunchedEffect(currentItem.id, nextItem?.id, currentIndex, playlistItems.size) {
         val uris = linkedSetOf<String>()
-        if (currentItem.type == MediaType.IMAGE) uris.add(currentItem.uri)
+        if (!isVideo) uris.add(currentItem.uri)
         nextItem?.takeIf { it.type == MediaType.IMAGE }?.uri?.let { uris.add(it) }
         onPreloadImages(uris.toList(), decodeSize.first, decodeSize.second)
     }
 
+    // Foto previa para fundidos suaves imagen→imagen. Se conserva al entrar en modo
+    // vídeo (la foto puede ser útil para la transición vídeo→imagen de vuelta).
     var underlayUri by remember { mutableStateOf<String?>(null) }
 
     Box(
@@ -71,25 +73,31 @@ fun SlideshowMediaViewport(
             customImageUri = backgroundImageUri,
             modifier = Modifier.fillMaxSize()
         )
-        underlayUri?.let { uri ->
-            SlideshowImageContent(
-                uri = uri,
-                transitionType = TransitionType.NONE,
-                modifier = Modifier.fillMaxSize()
-            )
+
+        // Underlay (foto previa) solo bajo imágenes para fundidos suaves.
+        if (!isVideo) {
+            underlayUri?.let { uri ->
+                SlideshowImageContent(
+                    uri = uri,
+                    transitionType = TransitionType.NONE,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
         }
 
+        // Imágenes con transición animada. El targetState es null cuando el ítem
+        // actual es un vídeo, haciendo que la imagen salga con su animación de salida.
         AnimatedContent(
-            targetState = currentItem,
-            contentKey = { it.id },
+            targetState = if (!isVideo) currentItem else null,
+            contentKey = { it?.id },
             transitionSpec = {
                 slideshowTransitionSpec(effectiveTransition, transitionDurationMs)
             },
             label = "slide_transition",
             modifier = Modifier.fillMaxSize()
         ) { item ->
-            when (item.type) {
-                MediaType.IMAGE -> SlideshowImageContent(
+            if (item != null) {
+                SlideshowImageContent(
                     uri = item.uri,
                     transitionType = effectiveTransition,
                     decodeWidth = decodeSize.first,
@@ -98,17 +106,25 @@ fun SlideshowMediaViewport(
                     onDisplayed = { underlayUri = item.uri },
                     onLoadError = onPlaybackError
                 )
-                MediaType.VIDEO -> SlideshowVideoPlayer(
-                    videoPlayer = videoPlayer,
-                    uri = item.uri,
-                    isPlaying = isPlaying,
-                    mediaVolume = mediaVolume,
-                    muteAudio = muteVideoAudio,
-                    onVideoEnded = onVideoEnded,
-                    onPlaybackError = onPlaybackError,
-                    modifier = Modifier.fillMaxSize()
-                )
             }
+        }
+
+        // Reproductor de vídeo FUERA de AnimatedContent: así no se recrea al cambiar
+        // de un vídeo a otro (solo cambian uri y playToken). Gracias a
+        // keepContentOnPlayerReset el último frame permanece visible mientras el
+        // nuevo vídeo carga, eliminando el flash negro entre vídeos.
+        if (isVideo) {
+            SlideshowVideoPlayer(
+                videoPlayer = videoPlayer,
+                uri = currentItem.uri,
+                isPlaying = isPlaying,
+                mediaVolume = mediaVolume,
+                muteAudio = muteVideoAudio,
+                onVideoEnded = onVideoEnded,
+                onPlaybackError = onPlaybackError,
+                playToken = playToken,
+                modifier = Modifier.fillMaxSize()
+            )
         }
     }
 }

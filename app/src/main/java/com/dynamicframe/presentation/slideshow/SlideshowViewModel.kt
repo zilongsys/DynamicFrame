@@ -20,6 +20,7 @@ import com.dynamicframe.domain.usecase.GetLocalAlbumsUseCase
 import com.dynamicframe.domain.usecase.ObserveMusicPlaybackUseCase
 import com.dynamicframe.domain.usecase.PreloadSlideshowImagesUseCase
 import com.dynamicframe.domain.usecase.UpdateSelectedAlbumsUseCase
+import com.dynamicframe.domain.usecase.UpdateSlideshowConfigUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -41,6 +42,7 @@ class SlideshowViewModel @Inject constructor(
     private val updateSelectedAlbums: UpdateSelectedAlbumsUseCase,
     private val getFolderDisplayName: GetFolderDisplayNameUseCase,
     val slideshowVideoPlayer: SlideshowVideoPlayerRepository,
+    private val updateSlideshowConfig: UpdateSlideshowConfigUseCase,
     private val debug: AppDebugLogger
 ) : ViewModel() {
     private val _toastMessage = MutableStateFlow<String?>(null)
@@ -83,10 +85,17 @@ class SlideshowViewModel @Inject constructor(
             ) { type, config -> type to config }
                 .collect { (type, config) ->
                     when (type) {
-                        MediaType.VIDEO -> musicCoordinator.onVideoStarted(
-                            config.videoMusicBehavior,
-                            config.duckedMusicVolume
-                        )
+                        MediaType.VIDEO ->
+                            // Si el vídeo está silenciado, la música sigue sonando normal
+                            // (no tiene sentido atenuarla o pausarla por un vídeo mudo).
+                            if (config.muteVideoAudio) {
+                                musicCoordinator.onPhotoShown(config.musicVolume)
+                            } else {
+                                musicCoordinator.onVideoStarted(
+                                    config.videoMusicBehavior,
+                                    config.duckedMusicVolume
+                                )
+                            }
                         MediaType.IMAGE -> musicCoordinator.onPhotoShown(config.musicVolume)
                         null -> Unit
                     }
@@ -95,7 +104,14 @@ class SlideshowViewModel @Inject constructor(
 
         viewModelScope.launch {
             slideshowConfig
-                .map { musicCoordinator.musicConfigKey(it.musicSourceType, it.musicFolderUris, it.musicShuffle) }
+                .map {
+                    musicCoordinator.musicConfigKey(
+                        it.musicSourceTypes,
+                        it.musicFolderUris,
+                        it.disabledMusicFolderUris,
+                        it.musicShuffle
+                    )
+                }
                 .distinctUntilChanged()
                 .collect { musicCoordinator.refreshPlaylist(force = true, playAfter = false) }
         }
@@ -142,11 +158,19 @@ class SlideshowViewModel @Inject constructor(
 
     fun setMusicVolume(volume: Float) = musicCoordinator.setVolume(volume)
 
+    /** Ajusta el volumen del audio del vídeo en reproducción (0.0–1.0). */
+    fun setMediaVolume(volume: Float) {
+        viewModelScope.launch {
+            updateSlideshowConfig { it.copy(mediaVolume = volume) }
+        }
+    }
+
+    /** Reproduce/pausa SOLO la música de fondo, sin afectar al slideshow de fotos/vídeos. */
     fun toggleMusicPlayback() {
-        if (slideshowState.value.isPlaying) {
-            pauseSlideshow()
+        if (musicState.value.isPlaying) {
+            musicCoordinator.pause()
         } else {
-            startSlideshow()
+            viewModelScope.launch { musicCoordinator.resumePlayback() }
         }
     }
 
@@ -197,10 +221,10 @@ class SlideshowViewModel @Inject constructor(
     private fun buildAlbumPills(config: SlideshowConfig, albums: List<MediaAlbum>): List<AlbumPillOption> {
         val pills = mutableListOf(AlbumPillOption(null, "Todos"))
         if (config.hasCustomMediaFolders()) {
-            config.photoFolderUris.distinct().forEach { uri ->
+            config.activePhotoFolderUris().distinct().forEach { uri ->
                 pills.add(AlbumPillOption(photoFolderPillId(uri), "Fotos: ${getFolderDisplayName(uri)}"))
             }
-            config.videoFolderUris.distinct().forEach { uri ->
+            config.activeVideoFolderUris().distinct().forEach { uri ->
                 pills.add(AlbumPillOption(videoFolderPillId(uri), "Videos: ${getFolderDisplayName(uri)}"))
             }
         } else {

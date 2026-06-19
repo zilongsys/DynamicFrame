@@ -2,6 +2,7 @@ package com.dynamicframe.presentation.home
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
@@ -11,7 +12,7 @@ import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -22,9 +23,12 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dynamicframe.ui.theme.MemoriaInk
@@ -35,6 +39,7 @@ import com.dynamicframe.ui.theme.MemoriaPurpleSoft
 import com.dynamicframe.ui.theme.MemoriaSurface
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.safeClickable
+import kotlinx.coroutines.launch
 
 enum class FeatureStatus { IMPLEMENTED, PARTIAL, COMING_SOON }
 
@@ -107,20 +112,57 @@ fun FeatureCatalogPanel() {
         modifier = Modifier.fillMaxSize())
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FeatureCatalogSection(
     filterCategory: String?,
     highlight: String?,
     modifier: Modifier = Modifier
 ) {
-    val allItems = memoriaFeatureCatalog
-        .filter { filterCategory == null || it.category == filterCategory }
     val device = LocalDeviceProfile.current
     val listState = rememberLazyListState()
+    val firstItemFocus = remember { FocusRequester() }
+
+    // Memoizado por filterCategory: si no, 'allItems' se recrea en cada recomposición y
+    // reinicia el LaunchedEffect de abajo provocando un scrollToItem(0) constante (el "salto").
+    val allItems = remember(filterCategory) {
+        memoriaFeatureCatalog
+            .filter { filterCategory == null || it.category == filterCategory }
+    }
 
     var statusFilter by remember { mutableStateOf<FeatureStatus?>(null) }
     val filteredItems = remember(statusFilter, allItems) {
         if (statusFilter == null) allItems else allItems.filter { it.status == statusFilter }
+    }
+
+    val scope = rememberCoroutineScope()
+    var listHadFocus by remember { mutableStateOf(false) }
+
+    // Índice del ítem actualmente enfocado; usado para scroll controlado (TV).
+    var focusedItemIdx by remember { mutableIntStateOf(0) }
+
+    // Al cambiar de filtro reposiciona la lista arriba y resetea el índice enfocado.
+    LaunchedEffect(statusFilter) {
+        if (device.isTv) {
+            focusedItemIdx = 0
+            runCatching { listState.scrollToItem(0) }
+        }
+    }
+
+    // Scroll controlado sin BringIntoViewSpec: solo desplaza cuando el ítem enfocado
+    // está fuera del área visible, evitando el efecto de "salto" que causaba el spec
+    // anterior al competir con el sistema de foco nativo de TV.
+    LaunchedEffect(focusedItemIdx) {
+        if (!device.isTv) return@LaunchedEffect
+        snapshotFlow { listState.layoutInfo }
+            .first { it.visibleItemsInfo.isNotEmpty() }
+            .let { info ->
+                val firstVisible = info.visibleItemsInfo.first().index
+                val lastVisible = info.visibleItemsInfo.last().index
+                if (focusedItemIdx !in firstVisible..lastVisible) {
+                    listState.animateScrollToItem(maxOf(0, focusedItemIdx - 1))
+                }
+            }
     }
 
     Column(modifier = modifier) {
@@ -179,52 +221,74 @@ private fun FeatureCatalogSection(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(end = 14.dp)
-                    .then(if (device.isTv) Modifier.focusGroup() else Modifier),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                // Padding extra arriba/abajo para que los ítems cercanos a los bordes
-                // no salten al recibir foco (el scroll tiene espacio de maniobra)
-                contentPadding = PaddingValues(vertical = 8.dp)
+                    .then(
+                        if (device.isTv) Modifier
+                            // Al ENTRAR en la lista (gana el foco), va siempre a la primera fila.
+                            .onFocusChanged { fs ->
+                                if (fs.hasFocus && !listHadFocus) {
+                                    scope.launch {
+                                        focusedItemIdx = 0
+                                        listState.scrollToItem(0)
+                                        runCatching { firstItemFocus.requestFocus() }
+                                    }
+                                }
+                                listHadFocus = fs.hasFocus
+                            }
+                            .focusGroup()
+                        else Modifier
+                    )
             ) {
-                items(filteredItems, key = { "${it.category}_${it.name}" }) { item ->
+                itemsIndexed(
+                    filteredItems,
+                    key = { _, it -> "${it.category}_${it.name}" }
+                ) { index, item ->
                     val emphasized = highlight != null &&
                         item.name.contains(highlight, ignoreCase = true)
                     val interactionSource = remember { MutableInteractionSource() }
                     val focused by interactionSource.collectIsFocusedAsState()
 
+                    // Foco = color morado completo (como los botones principales).
                     val bgColor by animateColorAsState(
                         targetValue = when {
-                            focused -> MemoriaPurpleSoft
-                            emphasized -> MemoriaPurpleSoft.copy(alpha = 0.45f)
+                            focused -> MemoriaPurple
+                            emphasized -> MemoriaPurpleSoft
                             else -> MemoriaSurface
                         },
-                        animationSpec = tween(durationMillis = 160),
+                        animationSpec = tween(durationMillis = 140),
                         label = "roadmap-item-bg"
                     )
-                    val accentAlpha by animateColorAsState(
-                        targetValue = if (focused || emphasized) MemoriaPurple else Color.Transparent,
-                        animationSpec = tween(durationMillis = 160),
-                        label = "roadmap-item-accent"
-                    )
+                    // Contenido en blanco cuando la fila está enfocada (sobre morado).
+                    val onBg = if (focused) Color.White else MemoriaInk
+                    val onBgMuted = if (focused) Color.White.copy(alpha = 0.85f) else MemoriaMuted
+
+                    val rowModifier = Modifier
+                        .fillMaxWidth()
+                        // Espaciado como MARGEN (antes de focusable) → queda fuera del área
+                        // enfocable y el auto-scroll por foco no sobre-desplaza = scroll natural.
+                        .padding(bottom = 8.dp)
+                        .then(
+                            if (device.isTv && index == 0) Modifier.focusRequester(firstItemFocus)
+                            else Modifier
+                        )
+                        // Trackea qué índice está enfocado para el scroll controlado.
+                        .then(
+                            if (device.isTv) Modifier.onFocusChanged { fs ->
+                                if (fs.isFocused) focusedItemIdx = index
+                            } else Modifier
+                        )
+                        .then(
+                            if (device.isTv) Modifier.focusable(
+                                interactionSource = interactionSource
+                            ) else Modifier
+                        )
 
                     Surface(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            // Barra izquierda de acento — se dibuja sin cambiar el layout
-                            .drawBehind {
-                                drawRect(
-                                    color = accentAlpha,
-                                    size = size.copy(width = 3.dp.toPx())
-                                )
-                            }
-                            .then(
-                                if (device.isTv) Modifier.focusable(
-                                    interactionSource = interactionSource
-                                ) else Modifier
-                            ),
+                        modifier = rowModifier,
                         shape = RoundedCornerShape(12.dp),
                         color = bgColor,
-                        // Borde fino fijo (1dp siempre) — no cambia tamaño al enfocar
-                        border = androidx.compose.foundation.BorderStroke(1.dp, MemoriaLine)
+                        // Sin borde cuando está enfocada (el morado ya destaca); fino si no.
+                        border = if (focused) null
+                        else androidx.compose.foundation.BorderStroke(1.dp, MemoriaLine)
                     ) {
                         Row(
                             modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
@@ -238,7 +302,7 @@ private fun FeatureCatalogSection(
                                         Icons.Default.Schedule
                                 },
                                 contentDescription = null,
-                                tint = when (item.status) {
+                                tint = if (focused) Color.White else when (item.status) {
                                     FeatureStatus.IMPLEMENTED -> MemoriaPurple
                                     FeatureStatus.PARTIAL -> MemoriaMuted
                                     FeatureStatus.COMING_SOON -> MemoriaMuted.copy(alpha = 0.5f)
@@ -246,17 +310,29 @@ private fun FeatureCatalogSection(
                                 modifier = Modifier.size(22.dp)
                             )
                             Column(Modifier.weight(1f)) {
-                                Text(item.name, color = if (focused) MemoriaInk else MemoriaInk,
-                                    fontSize = 14.sp, fontWeight = if (focused || emphasized)
-                                        FontWeight.SemiBold else FontWeight.Medium)
-                                Text(item.note, color = MemoriaMuted, fontSize = 12.sp)
+                                // Peso de fuente CONSTANTE + maxLines → la altura de la fila no
+                                // cambia al enfocar, eliminando el "brinco" al subir/bajar.
+                                Text(item.name, color = onBg,
+                                    fontSize = if (device.isTv) 18.sp else 14.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis)
+                                Text(item.note, color = onBgMuted,
+                                    fontSize = if (device.isTv) 14.sp else 12.sp,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis)
                                 if (item.category.isNotBlank()) {
-                                    Text(item.category, color = MemoriaMuted.copy(alpha = 0.7f),
-                                        fontSize = 10.sp)
+                                    Text(item.category,
+                                        color = if (focused) Color.White.copy(alpha = 0.7f)
+                                        else MemoriaMuted.copy(alpha = 0.7f),
+                                        fontSize = if (device.isTv) 12.sp else 10.sp,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis)
                                 }
                             }
                             Surface(
-                                color = when (item.status) {
+                                color = if (focused) Color.White.copy(alpha = 0.22f)
+                                else when (item.status) {
                                     FeatureStatus.IMPLEMENTED -> MemoriaPurpleSoft
                                     FeatureStatus.PARTIAL -> MemoriaLine
                                     FeatureStatus.COMING_SOON -> MemoriaLine.copy(alpha = 0.5f)
@@ -270,11 +346,11 @@ private fun FeatureCatalogSection(
                                         FeatureStatus.COMING_SOON -> "Próx."
                                     },
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp),
-                                    color = when (item.status) {
+                                    color = if (focused) Color.White else when (item.status) {
                                         FeatureStatus.IMPLEMENTED -> MemoriaPurple
                                         else -> MemoriaMuted
                                     },
-                                    fontSize = 11.sp,
+                                    fontSize = if (device.isTv) 13.sp else 11.sp,
                                     fontWeight = FontWeight.Medium
                                 )
                             }
@@ -299,19 +375,51 @@ private fun RoadmapFilterChip(
     color: Color,
     onClick: () -> Unit
 ) {
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    val shape = RoundedCornerShape(20.dp)
+
+    // Activo = violeta completo (todos) · Enfocado (no activo) = gris · Reposo = contorno.
+    val bg by animateColorAsState(
+        targetValue = when {
+            selected -> MemoriaPurple
+            focused -> MemoriaMuted
+            else -> MemoriaSurface
+        },
+        animationSpec = tween(120),
+        label = "chip-bg"
+    )
+    val textColor = when {
+        selected || focused -> Color.White
+        else -> MemoriaMuted
+    }
+    // Anillo de foco: SIEMPRE que esté enfocado (incluido el chip activo) se ve un borde claro,
+    // así se distingue sobre cuál estás aunque ya esté en violeta. Reposo no activo = contorno fino.
+    val borderColor = when {
+        focused -> Color.White
+        selected -> MemoriaPurple
+        else -> MemoriaLine
+    }
+    val borderWidth = if (focused) 2.dp else 1.dp
+
     Box(
         modifier = Modifier
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (selected) color else MemoriaSurface)
-            .border(1.dp, if (selected) color else MemoriaLine, RoundedCornerShape(20.dp))
-            .safeClickable(onClick = onClick)
+            .clip(shape)
+            .background(bg)
+            .border(borderWidth, borderColor, shape)
+            .safeClickable(
+                interactionSource = interactionSource,
+                showFocusBorder = false,
+                focusScale = false,
+                onClick = onClick
+            )
             .padding(horizontal = 14.dp, vertical = 8.dp)
     ) {
         Text(
             label,
             fontSize = 12.sp,
-            color = if (selected) Color.White else MemoriaMuted,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+            color = textColor,
+            fontWeight = if (selected || focused) FontWeight.SemiBold else FontWeight.Normal
         )
     }
 }

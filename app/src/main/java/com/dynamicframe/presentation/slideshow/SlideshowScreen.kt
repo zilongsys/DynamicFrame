@@ -20,6 +20,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
@@ -198,6 +199,7 @@ fun SlideshowScreen(
                             muteVideoAudio = config.muteVideoAudio,
                             mediaVolume = config.mediaVolume,
                             videoPlayer = viewModel.slideshowVideoPlayer,
+                            playToken = slideshowState.playToken,
                             onVideoEnded = { viewModel.onVideoCompleted() },
                             onPlaybackError = { viewModel.onPlaybackError() },
                             onPreloadImages = viewModel::preloadImages,
@@ -490,6 +492,55 @@ fun SlideshowScreen(
                                 )
                             }
                         }
+                        // Volumen del audio del vídeo (solo visible cuando reproduce un vídeo
+                        // y el audio no está silenciado globalmente).
+                        val currentItemForVol = slideshowState.currentItem
+                        if (currentItemForVol?.type == MediaType.VIDEO && !config.muteVideoAudio) {
+                            Spacer(Modifier.height(8.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                            ) {
+                                Icon(
+                                    Icons.Default.Movie,
+                                    contentDescription = null,
+                                    tint = GlassTextMuted,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                if (isTV) {
+                                    TvVolumeStepper(
+                                        label = "Vol. vídeo",
+                                        icon = Icons.Default.Movie,
+                                        value = config.mediaVolume,
+                                        onValueChange = viewModel::setMediaVolume,
+                                        showLabel = false,
+                                        horizontalKeysAdjustVolume = false,
+                                        hintDescription = "Volumen del audio del vídeo. ↑ ↓ ajustar · ← → cambiar botón",
+                                        onFocusHint = setControlHint,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                } else {
+                                    Icon(
+                                        Icons.Default.VolumeDown,
+                                        null,
+                                        tint = GlassTextMuted,
+                                        modifier = Modifier.size(18.dp)
+                                    )
+                                    Slider(
+                                        value = config.mediaVolume,
+                                        onValueChange = viewModel::setMediaVolume,
+                                        modifier = Modifier.weight(1f),
+                                        colors = SliderDefaults.colors(
+                                            thumbColor = Color.White,
+                                            activeTrackColor = Color.White.copy(alpha = 0.85f),
+                                            inactiveTrackColor = Color.White.copy(alpha = 0.25f)
+                                        )
+                                    )
+                                }
+                            }
+                        }
+
                         if (isTV) {
                             Spacer(Modifier.height(8.dp))
                             Text(

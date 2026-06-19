@@ -1,9 +1,81 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-18 — Video sin negro, volumen separado, scroll roadmap sin salto
+- Estado: Completado (v0.1.53)
+- Descripción: Vídeo fuera de AnimatedContent (no se recrea entre vídeos), shutter transparente + fade-in de primer frame → sin flash negro ni distorsión. Nuevo control de volumen de audio del vídeo en el panel de reproducción, independiente del volumen de música. Scroll de la hoja de ruta reemplazado: BringIntoViewSpec eliminado, ahora usa animateScrollToItem controlado por tracking de foco en cada ítem.
+
+## PENDIENTE — Fondo de pantalla personalizado (wallpaper)
+- Estado: Pendiente
+- Descripción: El usuario pide poder elegir un fondo de pantalla propio para cubrir las áreas que no llenan las fotos/vídeos. La infraestructura ya existe (PlaybackBackgroundType.CUSTOM_IMAGE + playbackBackgroundImageUri en SlideshowConfig, selector en SettingsScreen). Verificar que el selector en Ajustes → Visual en reproducción funcione correctamente y sea visible para el usuario.
+
 Historial de cambios pedidos por el usuario (orden más reciente primero).
 Para versiones publicadas ver `CHANGELOG.md`.
 
 ---
+
+## 2026-06-18 — Vídeo: pausa al terminar (causa real) + imagen de fondo persistente tras vídeo
+- Estado: Completado (v0.1.52)
+- Descripción: El fin de vídeo se detectaba con un listener que se re-registraba en cada recomposición (lambdas cambiantes), perdiendo a veces STATE_ENDED; sin temporizador de respaldo en modo "vídeo completo" el vídeo quedaba congelado. Ahora un único listener estable (rememberUpdatedState) maneja fin/errores/tamaño de forma fiable. Además, la capa underlay (foto previa) ya no se dibuja detrás del vídeo: solo bajo imágenes y se limpia al pasar a vídeo, así el vídeo se ve sobre el fondo de reproducción.
+
+---
+
+## 2026-06-18 — Vídeo: al terminar se pausaba en vez de avanzar/repetir; verificar aleatorios
+- Estado: Completado (v0.1.51)
+- Descripción: Añadido playToken en SlideshowState que se incrementa en cada navegación; el reproductor re-prepara al cambiar URI o playToken, reiniciando de forma determinista el mismo vídeo (bucle con un único vídeo). Multi-elemento ya avanzaba. Verificados los aleatorios: fotos/vídeos se barajan por tipo en buildPlaylist (re-baraja por sesión, arranque aleatorio en beginSession); música pre-barajada + REPEAT_MODE_ALL. Duración de vídeo: completo si está marcado, si no usa el intervalo de fotos.
+
+---
+
+## 2026-06-18 — Vídeo: pantalla en negro al pausar/reanudar (solo vídeos)
+- Estado: Completado (v0.1.50)
+- Descripción: La v0.1.49 usó TextureView (provoca negro al reanudar). Se revierte a SurfaceView (recomendado para TV) y la distorsión inicial se corrige forzando re-layout en onVideoSizeChanged/onRenderedFirstFrame + keepContentOnPlayerReset. Además stopIfCurrent(uri) al desmontar para no cortar el vídeo del siguiente slide en transiciones vídeo→vídeo.
+
+---
+
+## 2026-06-18 — Aleatorio de música real y vídeo sin distorsión
+- Estado: Completado (v0.1.49)
+- Descripción: El aleatorio de música ahora baraja la lista antes de reproducir (cada sesión empieza por una canción distinta), en vez de depender del shuffle de ExoPlayer que solo afecta al "siguiente"; comparación de lista obsoleta por conjunto de ids. El vídeo pasa a usar TextureView (antes SurfaceView), eliminando la distorsión inicial durante las transiciones: se muestra completo en su resolución (RESIZE_MODE_FIT, sin recortar) y correcto desde el primer frame, igual que las fotos.
+
+---
+
+## 2026-06-18 — Preferencias: carpetas de fotos aparecían en vídeos; mover Música tras Videos
+- Estado: Completado (v0.1.48)
+- Descripción: Corregido que la sección de vídeos mostrara carpetas de fotos (fallback a MEDIA_FOLDERS legacy en cada guardado): ahora solo se migra si la clave específica nunca se guardó. Sección "Música de fondo" reubicada justo después de "Videos".
+
+---
+
+## PENDIENTE — Hoja de ruta: persiste un efecto de "salto" al desplazar
+- Estado: Pendiente
+- Descripción: Tras los arreglos de scroll (v0.1.44–v0.1.47) el usuario sigue percibiendo un efecto de salto al desplazarse por el listado de la hoja de ruta. Queda por investigar/resolver. Próximas hipótesis a probar: control de scroll totalmente manual por índice enfocado (con buffer para no romper la navegación con D-pad), o revisar bring-into-view/animación restante.
+
+---
+
+## 2026-06-18 — Hoja de ruta: scroll ágil (90 ms) y anillo de foco visible sobre el chip activo
+- Estado: Completado (v0.1.47)
+- Descripción: Reducida la animación de auto-scroll a 90 ms (sin retardo al navegar rápido). Los chips de filtro muestran un anillo blanco al estar enfocados, de modo que se ve el foco incluso sobre el chip activo en violeta.
+
+## 2026-06-18 — Hoja de ruta: scroll suave definitivo (fin del brinco) con BringIntoViewSpec propio
+- Estado: Completado (v0.1.46)
+- Descripción: El brinco venía de la animación spring del auto-scroll por foco. Se sustituye por un BringIntoViewSpec con desplazamiento mínimo (filas visibles no se mueven, D-pad sigue funcionando) y animación tween suave → scroll natural.
+
+## 2026-06-18 — Hoja de ruta: scroll natural sin salto por línea y primera fila al entrar (robusto)
+- Estado: Completado (v0.1.45)
+- Descripción: Eliminado el salto por línea moviendo el espaciado a margen fuera del área enfocable (el bring-into-view ya no sobre-desplaza). La primera fila se marca siempre al entrar en la lista mediante onFocusChanged (seguro, sin la API experimental que crasheaba).
+
+## 2026-06-18 — Hoja de ruta: crash al navegar, salto al desplazar y foco izquierdo a la sección correcta
+- Estado: Completado (v0.1.44)
+- Descripción: Corregido el crash que cerraba la app (eliminado focusProperties enter con FocusRequester no adjunto). Eliminado el salto al subir/bajar (allItems memoizado; scrollToItem(0) solo al cambiar filtro). Al salir con flecha izquierda el foco vuelve al item del menú de la sección actual (focusProperties exit).
+
+## 2026-06-17 — Hoja de ruta: marcar 1ra fila al entrar, quitar brinco al desplazar, chips activo=violeta/enfocado=gris
+- Estado: Completado (v0.1.43)
+- Descripción: Al entrar en la lista se marca la primera fila (focusProperties enter + foco inicial). Eliminado el "brinco" al subir/bajar fijando la altura de fila (peso de fuente constante + maxLines). Chips de filtro con comportamiento moderno: activo = violeta completo, enfocado (no activo) = gris, reposo = contorno.
+
+## 2026-06-17 — Hoja de ruta: foco morado completo, caer en primera fila, volver al menú al salir; botones morado al enfocar
+- Estado: Completado (v0.1.42)
+- Descripción: Filas de la hoja de ruta enfocadas con relleno morado completo y texto blanco. Al entrar en la lista el foco cae en la primera fila. Al salir por la izquierda el foco vuelve al ítem seleccionado del menú lateral (FocusRequester compartido + focusProperties left). Todos los botones (NostalgiaActionButton, DeviceActionButton, TvPickerChip, TvStepperChip y menú lateral) se rellenan de morado completo con contenido blanco al enfocar. Nuevo parámetro focusScale en safeClickable/tvClickable.
+
+## 2026-06-17 — Auditoría completa: arreglar todo paso a paso
+- Estado: Completado (v0.1.41)
+- Descripción: Tras analizar todo el proyecto, corregidos errores críticos y lógicos: carpetas desactivadas ahora se excluyen de fotos/vídeos/música; multi-fuente de música real; el vídeo se detiene al cambiar de slide y la pausa ya no lo reinicia; música no se atenúa con vídeo mudo; el botón de música solo controla la música; contador anti-bucle si todos los medios fallan; autostart TV más robusto (try/catch, consume AUTO_STARTED, abre slideshow); banner de permisos accionable; límites de decodificación Coil (miniaturas y fondo); race condition de DataStore serializada; textos del roadmap más grandes en TV; fuentes de música no implementadas atenuadas/deshabilitadas; mensaje de borrado claro en Android 10+.
 
 ## 2026-06-17 — Preferencias: clip, D-pad, duplicado, música aleatoria, notas, reorganización
 - Estado: Completado (v0.1.38)
