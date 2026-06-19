@@ -39,6 +39,7 @@ import com.dynamicframe.ui.theme.MemoriaPurpleSoft
 import com.dynamicframe.ui.theme.MemoriaSurface
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.safeClickable
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
 enum class FeatureStatus { IMPLEMENTED, PARTIAL, COMING_SOON }
@@ -154,15 +155,13 @@ private fun FeatureCatalogSection(
     // anterior al competir con el sistema de foco nativo de TV.
     LaunchedEffect(focusedItemIdx) {
         if (!device.isTv) return@LaunchedEffect
-        snapshotFlow { listState.layoutInfo }
+        val info = snapshotFlow { listState.layoutInfo }
             .first { it.visibleItemsInfo.isNotEmpty() }
-            .let { info ->
-                val firstVisible = info.visibleItemsInfo.first().index
-                val lastVisible = info.visibleItemsInfo.last().index
-                if (focusedItemIdx !in firstVisible..lastVisible) {
-                    listState.animateScrollToItem(maxOf(0, focusedItemIdx - 1))
-                }
-            }
+        val firstVisible = info.visibleItemsInfo.first().index
+        val lastVisible = info.visibleItemsInfo.last().index
+        if (focusedItemIdx !in firstVisible..lastVisible) {
+            listState.animateScrollToItem(maxOf(0, focusedItemIdx - 1))
+        }
     }
 
     Column(modifier = modifier) {

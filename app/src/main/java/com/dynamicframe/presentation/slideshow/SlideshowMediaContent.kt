@@ -85,18 +85,20 @@ fun SlideshowMediaViewport(
             }
         }
 
-        // Imágenes con transición animada. El targetState es null cuando el ítem
-        // actual es un vídeo, haciendo que la imagen salga con su animación de salida.
+        // Imágenes con transición animada. targetState es siempre MediaItem para que
+        // slideshowTransitionSpec (tipado sobre MediaItem) compile sin cambios.
+        // Cuando el ítem es vídeo, el lambda no renderiza nada (el vídeo se dibuja
+        // en la capa de abajo separada del AnimatedContent).
         AnimatedContent(
-            targetState = if (!isVideo) currentItem else null,
-            contentKey = { it?.id },
+            targetState = currentItem,
+            contentKey = { it.id },
             transitionSpec = {
                 slideshowTransitionSpec(effectiveTransition, transitionDurationMs)
             },
             label = "slide_transition",
             modifier = Modifier.fillMaxSize()
         ) { item ->
-            if (item != null) {
+            if (item.type == MediaType.IMAGE) {
                 SlideshowImageContent(
                     uri = item.uri,
                     transitionType = effectiveTransition,
