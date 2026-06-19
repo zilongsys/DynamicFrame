@@ -47,6 +47,9 @@ fun PlaybackLetterboxBackground(
                         uri = customImageUri,
                         crossfadeMillis = 300,
                         contentScale = ContentScale.Crop,
+                        // Fondo a pantalla completa: acota la decodificación para evitar OOM con 4K+.
+                        decodeWidth = 1920,
+                        decodeHeight = 1080,
                         modifier = Modifier.fillMaxSize()
                     )
                 } else {

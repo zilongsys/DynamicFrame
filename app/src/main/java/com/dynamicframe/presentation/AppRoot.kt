@@ -19,7 +19,7 @@ import com.dynamicframe.presentation.settings.SettingsViewModel
 import com.dynamicframe.ui.theme.DynamicFrameTheme
 
 @Composable
-fun AppRoot(isTV: Boolean) {
+fun AppRoot(isTV: Boolean, autoStart: Boolean = false) {
     val activity = LocalContext.current as ComponentActivity
     val settingsViewModel: SettingsViewModel = hiltViewModel()
     val debugViewModel: DebugViewModel = hiltViewModel(activity)
@@ -39,7 +39,11 @@ fun AppRoot(isTV: Boolean) {
                         modifier = Modifier.fillMaxSize(),
                         color = MaterialTheme.colorScheme.background
                     ) {
-                        DynamicFrameNavHost(isTV = isTV, debugViewModel = debugViewModel)
+                        DynamicFrameNavHost(
+                            isTV = isTV,
+                            debugViewModel = debugViewModel,
+                            autoStart = autoStart
+                        )
                     }
                     DebugConsoleOverlay(viewModel = debugViewModel)
                 }

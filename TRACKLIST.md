@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-17 — General: scrollbar lateral, foco al entrar, icono shuffle, volumen vídeo enlazado, colores por sección
+- Estado: Completado (v0.1.54)
+- Descripción: (1) Scrollbar en la barra lateral principal (`Modifier.verticalScrollbar`). (2) Al pulsar flecha derecha desde el menú el foco entra al primer elemento focable de la sección (`focusProperties { right = contentFocus }` + `focusRequester` sobre el `focusGroup` del contenido). (3) Nuevo icono de aleatorio unificado a partir del SVG aportado (`ic_shuffle_dynamic` / `ShuffleIcon`), reemplaza todos los random de Ajustes y Dashboard. (4) Control de volumen de vídeo en Preferencias (sección Videos) enlazado con el de reproducción vía `config.mediaVolume`; volumen de música también persistido en `config.musicVolume` para enlazar todas sus instancias. (5) Colores de acento por sección en Preferencias para identificar visualmente dónde estás.
+
 ## 2026-06-18 — Video sin negro, volumen separado, scroll roadmap sin salto
 - Estado: Completado (v0.1.53)
 - Descripción: Vídeo fuera de AnimatedContent (no se recrea entre vídeos), shutter transparente + fade-in de primer frame → sin flash negro ni distorsión. Nuevo control de volumen de audio del vídeo en el panel de reproducción, independiente del volumen de música. Scroll de la hoja de ruta reemplazado: BringIntoViewSpec eliminado, ahora usa animateScrollToItem controlado por tracking de foco en cada ítem.

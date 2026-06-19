@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
-import androidx.compose.material.icons.outlined.Shuffle
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -40,6 +39,7 @@ fun MemoriaDashboard(
     musicState: MusicPlayerState,
     albumLabel: String,
     showPermissionDenied: Boolean = false,
+    onGrantAccess: (() -> Unit)? = null,
     onOpenFullscreen: () -> Unit,
     onIntervalChange: (Int) -> Unit,
     onTransitionChange: (TransitionType) -> Unit,
@@ -69,7 +69,8 @@ fun MemoriaDashboard(
 
         if (showPermissionDenied) {
             MediaPermissionDeniedBanner(
-                message = "Concede acceso a fotos y vídeos en Ajustes del sistema o elige carpetas en Configuración."
+                message = "Concede acceso a fotos y vídeos en Ajustes del sistema o elige carpetas en Configuración.",
+                onGrantAccess = onGrantAccess
             )
         }
 
@@ -419,7 +420,7 @@ private fun MemoriaShuffleToggleChip(
                 modifier = Modifier.size(28.dp)
             )
             Icon(
-                Icons.Outlined.Shuffle,
+                ShuffleIcon,
                 contentDescription = null,
                 tint = tint,
                 modifier = Modifier.size(24.dp)

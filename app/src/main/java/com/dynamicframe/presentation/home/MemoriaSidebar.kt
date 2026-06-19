@@ -3,6 +3,8 @@ package com.dynamicframe.presentation.home
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusGroup
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -32,6 +34,7 @@ import com.dynamicframe.ui.theme.AppVersionLabel
 import com.dynamicframe.ui.theme.requestFocusWhenReady
 import com.dynamicframe.ui.theme.safeClickable
 import com.dynamicframe.ui.theme.tvFocusRequester
+import com.dynamicframe.ui.theme.verticalScrollbar
 import androidx.compose.ui.focus.FocusRequester
 import kotlinx.coroutines.delay
 
@@ -39,11 +42,17 @@ import kotlinx.coroutines.delay
 fun MemoriaSidebar(
     selected: MemoriaDestination,
     photoCount: Int,
-    onSelect: (MemoriaDestination) -> Unit
+    onSelect: (MemoriaDestination) -> Unit,
+    selectedItemFocus: FocusRequester? = null,
+    contentFocus: FocusRequester? = null
 ) {
     val device = LocalDeviceProfile.current
     val firstFocus = remember { FocusRequester() }
-    val selectedFocus = remember { FocusRequester() }
+    val localSelectedFocus = remember { FocusRequester() }
+    val scrollState = rememberScrollState()
+    // El requester del item seleccionado se comparte con el contenido para que
+    // al pulsar IZQUIERDA desde la lista el foco vuelva siempre aquí (estilo Netflix).
+    val selectedFocus = selectedItemFocus ?: localSelectedFocus
     var initialized by remember { mutableStateOf(false) }
 
     LaunchedEffect(device.isTv) {
@@ -68,9 +77,19 @@ fun MemoriaSidebar(
             .fillMaxHeight()
             .background(Color.White)
             .border(width = 1.dp, color = MemoriaLine)
+            .verticalScrollbar(scrollState, color = MemoriaLine)
             .padding(horizontal = 16.dp, vertical = 24.dp)
-            .verticalScroll(rememberScrollState())
-            .then(if (device.isTv) Modifier.focusGroup() else Modifier)
+            .verticalScroll(scrollState)
+            .then(
+                if (device.isTv) Modifier
+                    // Flecha DERECHA desde el menú → primer elemento focable del contenido.
+                    .then(
+                        if (contentFocus != null) Modifier.focusProperties { right = contentFocus }
+                        else Modifier
+                    )
+                    .focusGroup()
+                else Modifier
+            )
     ) {
         Row(
             verticalAlignment = Alignment.Bottom,
@@ -144,17 +163,41 @@ private fun MemoriaSidebarItem(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    // Foco = relleno morado completo + contenido blanco; seleccionado (sin foco) = morado suave.
+    val bg = when {
+        focused -> MemoriaPurple
+        selected -> MemoriaPurpleSoft
+        else -> Color.Transparent
+    }
+    val contentColor = when {
+        focused -> Color.White
+        selected -> MemoriaInk
+        else -> MemoriaMuted
+    }
+    val iconTint = when {
+        focused -> Color.White
+        selected -> MemoriaPurple
+        else -> MemoriaMuted
+    }
+
     Row(
         modifier = modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(if (selected) MemoriaPurpleSoft else Color.Transparent)
-            .safeClickable(onClick = onClick, showFocusBorder = !selected)
+            .background(bg)
+            .safeClickable(
+                onClick = onClick,
+                showFocusBorder = false,
+                focusScale = false,
+                interactionSource = source
+            )
             .padding(horizontal = 12.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        if (selected) {
+        if (selected && !focused) {
             Box(
                 Modifier
                     .width(3.dp)
@@ -162,17 +205,21 @@ private fun MemoriaSidebarItem(
                     .background(MemoriaPurple, RoundedCornerShape(2.dp))
             )
         }
-        Icon(icon, label, tint = if (selected) MemoriaPurple else MemoriaMuted, modifier = Modifier.size(22.dp))
+        Icon(icon, label, tint = iconTint, modifier = Modifier.size(22.dp))
         Text(
             label,
-            color = if (selected) MemoriaInk else MemoriaMuted,
+            color = contentColor,
             fontSize = 15.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            fontWeight = if (selected || focused) FontWeight.SemiBold else FontWeight.Normal,
             modifier = Modifier.weight(1f)
         )
         badge?.let {
-            Surface(color = MemoriaPurpleSoft, shape = RoundedCornerShape(8.dp)) {
-                Text(it, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), fontSize = 12.sp, color = MemoriaPurple)
+            Surface(
+                color = if (focused) Color.White.copy(alpha = 0.22f) else MemoriaPurpleSoft,
+                shape = RoundedCornerShape(8.dp)
+            ) {
+                Text(it, modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp),
+                    fontSize = 12.sp, color = if (focused) Color.White else MemoriaPurple)
             }
         }
     }

@@ -196,6 +196,12 @@ data class SlideshowState(
     val allItems: List<MediaItem> = emptyList(),
     val playlistItems: List<MediaItem> = emptyList(),
     val isTransitioning: Boolean = false,
+    /**
+     * Contador que se incrementa en cada navegación. Permite reiniciar la
+     * reproducción del MISMO vídeo (p. ej. bucle con un único vídeo) aunque la
+     * URI no cambie, ya que el reproductor reacciona al cambio de este token.
+     */
+    val playToken: Int = 0,
     val error: String? = null
 )
 

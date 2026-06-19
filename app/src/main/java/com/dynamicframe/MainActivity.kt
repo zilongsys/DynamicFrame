@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.WindowCompat
+import com.dynamicframe.data.receiver.BootReceiver
 import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.usecase.PauseAppPlaybackUseCase
 import com.dynamicframe.presentation.AppRoot
@@ -38,10 +39,12 @@ class MainActivity : ComponentActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         WindowCompat.setDecorFitsSystemWindows(window, true)
 
+        val autoStarted = intent?.getBooleanExtra(BootReceiver.EXTRA_AUTO_STARTED, false) ?: false
+
         setContent {
-            AppRoot(isTV = isTV)
+            AppRoot(isTV = isTV, autoStart = autoStarted)
         }
-        debugLogger.i("Lifecycle", "MainActivity onCreate (tv=$isTV)")
+        debugLogger.i("Lifecycle", "MainActivity onCreate (tv=$isTV, autoStart=$autoStarted)")
     }
 
     override fun onStop() {

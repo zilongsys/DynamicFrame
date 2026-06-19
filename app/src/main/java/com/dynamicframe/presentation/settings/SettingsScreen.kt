@@ -48,6 +48,7 @@ import com.dynamicframe.ui.theme.displayName as playbackBackgroundDisplayName
 import com.dynamicframe.ui.theme.AppVersionLabel
 import com.dynamicframe.ui.theme.MemoriaLine
 import com.dynamicframe.ui.theme.MemoriaPurple
+import com.dynamicframe.ui.theme.ShuffleIcon
 
 private enum class FolderTarget { PHOTO, VIDEO, MUSIC }
 
@@ -215,14 +216,15 @@ fun SettingsScreen(
             if (showPermissionDenied) {
                 item {
                     MediaPermissionDeniedBanner(
-                        message = "Activa el acceso a fotos, vídeos o música en los ajustes del sistema para elegir carpetas."
+                        message = "Activa el acceso a fotos, vídeos o música en los ajustes del sistema para elegir carpetas.",
+                        onGrantAccess = requestMediaAccess?.let { req -> { req {} } }
                     )
                 }
             }
 
             // ── FOTOS ─────────────────────────────────────────────────────────
             item {
-                SettingsSectionHeader("Fotos", Icons.Default.Photo)
+                SettingsSectionHeader("Fotos", Icons.Default.Photo, SectionColorPhotos)
                 Text(
                     text = "Elige las carpetas con tus fotos. Deja vacío para usar la galería del dispositivo.",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
@@ -304,7 +306,7 @@ fun SettingsScreen(
             item {
                 SettingsSwitchItem(
                     title = "Fotos aleatorias",
-                    icon = Icons.Default.Shuffle,
+                    icon = ShuffleIcon,
                     checked = config.photoShuffle,
                     note = "Reproduce las fotos en orden aleatorio.",
                     onCheckedChange = viewModel::updatePhotoShuffle
@@ -314,7 +316,7 @@ fun SettingsScreen(
             // ── VIDEOS ────────────────────────────────────────────────────────
             item {
                 Spacer(Modifier.height(8.dp))
-                SettingsSectionHeader("Videos", Icons.Default.Videocam)
+                SettingsSectionHeader("Videos", Icons.Default.Videocam, SectionColorVideos)
                 Text(
                     text = "Elige las carpetas con tus videos y configura su reproducción.",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
@@ -339,7 +341,7 @@ fun SettingsScreen(
             item {
                 SettingsSwitchItem(
                     title = "Videos aleatorios",
-                    icon = Icons.Default.Shuffle,
+                    icon = ShuffleIcon,
                     checked = config.videoShuffle,
                     note = "Reproduce los videos en orden aleatorio.",
                     onCheckedChange = viewModel::updateVideoShuffle
@@ -354,6 +356,18 @@ fun SettingsScreen(
                     onCheckedChange = { viewModel.updateConfig(config.copy(muteVideoAudio = it)) }
                 )
             }
+            if (!config.muteVideoAudio) {
+                item {
+                    SettingsSliderItem(
+                        title = "Volumen de video",
+                        value = config.mediaVolume,
+                        valueRange = 0f..1f,
+                        valueLabel = "${(config.mediaVolume * 100).toInt()}%",
+                        note = "Volumen del audio de los videos. Se sincroniza con el control de la reproducción.",
+                        onValueChange = { viewModel.updateMediaVolume(it) }
+                    )
+                }
+            }
             item {
                 SettingsSwitchItem(
                     title = "Reproducir video completo",
@@ -364,68 +378,10 @@ fun SettingsScreen(
                 )
             }
 
-            // ── SLIDESHOW ─────────────────────────────────────────────────────
-            item {
-                Spacer(Modifier.height(8.dp))
-                SettingsSectionHeader("Slideshow", Icons.Default.Slideshow)
-            }
-            item {
-                SettingsSliderItem(
-                    title = "Tiempo por foto",
-                    value = config.intervalSeconds.toFloat(),
-                    valueRange = 3f..60f, steps = 56,
-                    valueLabel = "${config.intervalSeconds}s",
-                    note = "Segundos que se muestra cada foto antes de pasar a la siguiente.",
-                    onValueChange = { viewModel.updateInterval(it.toInt()) }
-                )
-            }
-            item {
-                SettingsDropdownItem(
-                    title = "Transición",
-                    icon = Icons.Default.Animation,
-                    currentValue = config.transition.displayName(),
-                    options = TransitionType.entries.map { it.displayName() },
-                    note = "Efecto visual entre una foto y la siguiente.",
-                    onSelect = { idx -> viewModel.updateTransition(TransitionType.entries[idx]) }
-                )
-            }
-            item {
-                SettingsSliderItem(
-                    title = "Duración de transición",
-                    value = config.transitionDurationMs.toFloat(),
-                    valueRange = 800f..2800f, steps = 19,
-                    valueLabel = "${config.transitionDurationMs} ms",
-                    note = "Duración del efecto de transición en milisegundos.",
-                    onValueChange = { viewModel.updateConfig(config.copy(transitionDurationMs = it.toInt())) }
-                )
-            }
-            item {
-                SettingsDropdownItem(
-                    title = "Mostrar",
-                    icon = Icons.Default.Filter,
-                    currentValue = config.mediaContentFilter.displayName(),
-                    options = MediaContentFilter.entries.map { it.displayName() },
-                    note = "Filtra si el slideshow muestra fotos, videos o ambos.",
-                    onSelect = { idx ->
-                        viewModel.updateConfig(config.copy(mediaContentFilter = MediaContentFilter.entries[idx]))
-                        onMediaChanged()
-                    }
-                )
-            }
-            item {
-                SettingsSwitchItem(
-                    title = "Reproducir en bucle",
-                    icon = Icons.Default.Repeat,
-                    checked = config.loop,
-                    note = "Vuelve al inicio cuando se terminen todos los medios.",
-                    onCheckedChange = viewModel::updateLoop
-                )
-            }
-
             // ── MÚSICA DE FONDO ───────────────────────────────────────────────
             item {
                 Spacer(Modifier.height(8.dp))
-                SettingsSectionHeader("Música de fondo", Icons.Default.MusicNote)
+                SettingsSectionHeader("Música de fondo", Icons.Default.MusicNote, SectionColorMusic)
             }
             item {
                 Text("Fuentes activas", fontWeight = FontWeight.Medium, fontSize = 14.sp,
@@ -442,13 +398,14 @@ fun SettingsScreen(
                         onCheckedChange = { viewModel.toggleMusicSource(type) }
                     )
                 }
-                // Placeholders futuras fuentes
+                // Placeholders futuras fuentes (deshabilitados/atenuados)
                 listOf(MusicSourceType.THEME, MusicSourceType.SPOTIFY, MusicSourceType.YOUTUBE).forEach { type ->
                     SettingsSwitchItem(
                         title = "${type.displayName()} (próximamente)",
                         icon = Icons.Default.LibraryMusic,
-                        checked = type in config.musicSourceTypes,
+                        checked = false,
                         note = "Disponible en una versión futura.",
+                        enabled = false,
                         onCheckedChange = { }
                     )
                 }
@@ -466,7 +423,7 @@ fun SettingsScreen(
             item {
                 SettingsSwitchItem(
                     title = "Música aleatoria",
-                    icon = Icons.Default.Shuffle,
+                    icon = ShuffleIcon,
                     checked = config.musicShuffle,
                     note = "Reproduce las canciones en orden aleatorio.",
                     onCheckedChange = viewModel::updateMusicShuffle
@@ -552,10 +509,68 @@ fun SettingsScreen(
                 }
             }
 
+            // ── SLIDESHOW ─────────────────────────────────────────────────────
+            item {
+                Spacer(Modifier.height(8.dp))
+                SettingsSectionHeader("Slideshow", Icons.Default.Slideshow, SectionColorSlideshow)
+            }
+            item {
+                SettingsSliderItem(
+                    title = "Tiempo por foto",
+                    value = config.intervalSeconds.toFloat(),
+                    valueRange = 3f..60f, steps = 56,
+                    valueLabel = "${config.intervalSeconds}s",
+                    note = "Segundos que se muestra cada foto antes de pasar a la siguiente.",
+                    onValueChange = { viewModel.updateInterval(it.toInt()) }
+                )
+            }
+            item {
+                SettingsDropdownItem(
+                    title = "Transición",
+                    icon = Icons.Default.Animation,
+                    currentValue = config.transition.displayName(),
+                    options = TransitionType.entries.map { it.displayName() },
+                    note = "Efecto visual entre una foto y la siguiente.",
+                    onSelect = { idx -> viewModel.updateTransition(TransitionType.entries[idx]) }
+                )
+            }
+            item {
+                SettingsSliderItem(
+                    title = "Duración de transición",
+                    value = config.transitionDurationMs.toFloat(),
+                    valueRange = 800f..2800f, steps = 19,
+                    valueLabel = "${config.transitionDurationMs} ms",
+                    note = "Duración del efecto de transición en milisegundos.",
+                    onValueChange = { viewModel.updateConfig(config.copy(transitionDurationMs = it.toInt())) }
+                )
+            }
+            item {
+                SettingsDropdownItem(
+                    title = "Mostrar",
+                    icon = Icons.Default.Filter,
+                    currentValue = config.mediaContentFilter.displayName(),
+                    options = MediaContentFilter.entries.map { it.displayName() },
+                    note = "Filtra si el slideshow muestra fotos, videos o ambos.",
+                    onSelect = { idx ->
+                        viewModel.updateConfig(config.copy(mediaContentFilter = MediaContentFilter.entries[idx]))
+                        onMediaChanged()
+                    }
+                )
+            }
+            item {
+                SettingsSwitchItem(
+                    title = "Reproducir en bucle",
+                    icon = Icons.Default.Repeat,
+                    checked = config.loop,
+                    note = "Vuelve al inicio cuando se terminen todos los medios.",
+                    onCheckedChange = viewModel::updateLoop
+                )
+            }
+
             // ── VISUAL EN REPRODUCCIÓN ────────────────────────────────────────
             item {
                 Spacer(Modifier.height(8.dp))
-                SettingsSectionHeader("Visual en reproducción", Icons.Default.Fullscreen)
+                SettingsSectionHeader("Visual en reproducción", Icons.Default.Fullscreen, SectionColorVisual)
                 Text(
                     text = "Toca/OK en pantalla completa para pausar. Los controles se ocultan solos.",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
@@ -664,7 +679,7 @@ fun SettingsScreen(
             // ── RELOJ Y FECHA ─────────────────────────────────────────────────
             item {
                 Spacer(Modifier.height(8.dp))
-                SettingsSectionHeader("Reloj y fecha", Icons.Default.AccessTime)
+                SettingsSectionHeader("Reloj y fecha", Icons.Default.AccessTime, SectionColorClock)
             }
             item {
                 SettingsSwitchItem(
@@ -701,7 +716,7 @@ fun SettingsScreen(
             if (device.isTv) {
                 item {
                     Spacer(Modifier.height(8.dp))
-                    SettingsSectionHeader("Pantalla TV", Icons.Default.Tv)
+                    SettingsSectionHeader("Pantalla TV", Icons.Default.Tv, SectionColorTv)
                     Text(
                         text = "El borde de pantalla muestra los límites reales de tu TV para ajustar el recorte.",
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
@@ -733,7 +748,7 @@ fun SettingsScreen(
             // ── SISTEMA ───────────────────────────────────────────────────────
             item {
                 Spacer(Modifier.height(8.dp))
-                SettingsSectionHeader("Sistema", Icons.Default.Settings)
+                SettingsSectionHeader("Sistema", Icons.Default.Settings, SectionColorSystem)
             }
             item {
                 SettingsSwitchItem(
@@ -785,22 +800,50 @@ fun SettingsScreen(
 
 // ── Componentes reutilizables ─────────────────────────────────────────────────
 
+// Colores de acento por sección — ayudan a saber visualmente en qué sección estás.
+val SectionColorPhotos = Color(0xFF2E7BE6)
+val SectionColorVideos = Color(0xFFE8612C)
+val SectionColorMusic = Color(0xFF2BA84A)
+val SectionColorSlideshow = Color(0xFF7C4DFF)
+val SectionColorVisual = Color(0xFF0E9AA7)
+val SectionColorClock = Color(0xFFE0A106)
+val SectionColorTv = Color(0xFF5C6BC0)
+val SectionColorSystem = Color(0xFF6B7280)
+
 @Composable
-fun SettingsSectionHeader(title: String, icon: ImageVector) {
+fun SettingsSectionHeader(
+    title: String,
+    icon: ImageVector,
+    accent: Color = MaterialTheme.colorScheme.primary
+) {
     Row(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp),
-        modifier = Modifier.padding(vertical = 4.dp)
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(accent.copy(alpha = 0.10f))
+            .padding(horizontal = 10.dp, vertical = 8.dp)
     ) {
-        Icon(icon, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
+        Box(
+            Modifier
+                .width(4.dp)
+                .height(22.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(accent)
+        )
+        Icon(icon, contentDescription = null, tint = accent)
         Text(
             text = title,
             style = MaterialTheme.typography.titleMedium,
             fontWeight = FontWeight.Bold,
-            color = MaterialTheme.colorScheme.primary
+            color = accent
         )
     }
-    HorizontalDivider(modifier = Modifier.padding(bottom = 8.dp))
+    HorizontalDivider(
+        color = accent.copy(alpha = 0.35f),
+        modifier = Modifier.padding(top = 6.dp, bottom = 8.dp)
+    )
 }
 
 @Composable
@@ -809,16 +852,21 @@ fun SettingsSwitchItem(
     icon: ImageVector,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    note: String = ""
+    note: String = "",
+    enabled: Boolean = true
 ) {
     val device = LocalDeviceProfile.current
     val source = remember { MutableInteractionSource() }
     val focused by source.collectIsFocusedAsState()
-    Column(modifier = Modifier.fillMaxWidth()) {
+    val contentAlpha = if (enabled) 1f else 0.4f
+    Column(modifier = Modifier.fillMaxWidth().alpha(contentAlpha)) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .safeClickable(interactionSource = source) { onCheckedChange(!checked) }
+                .then(
+                    if (enabled) Modifier.safeClickable(interactionSource = source) { onCheckedChange(!checked) }
+                    else Modifier
+                )
                 .padding(vertical = if (device.isTv) 10.dp else 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
@@ -843,7 +891,7 @@ fun SettingsSwitchItem(
                     modifier = Modifier.size(26.dp)
                 )
             } else {
-                Switch(checked = checked, onCheckedChange = onCheckedChange)
+                Switch(checked = checked, onCheckedChange = onCheckedChange, enabled = enabled)
             }
         }
         if (note.isNotBlank() && (!device.isTv || focused)) {

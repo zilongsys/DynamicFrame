@@ -1,7 +1,11 @@
 package com.dynamicframe.domain.model
 
+/**
+ * Hay carpetas custom solo si queda al menos una ACTIVA (no desactivada).
+ * Si el usuario desactiva todas, se vuelve a la galería del dispositivo.
+ */
 fun SlideshowConfig.hasCustomMediaFolders(): Boolean =
-    photoFolderUris.isNotEmpty() || videoFolderUris.isNotEmpty()
+    activePhotoFolderUris().isNotEmpty() || activeVideoFolderUris().isNotEmpty()
 
 fun SlideshowConfig.allMediaFolderUris(): List<String> =
     (photoFolderUris + videoFolderUris).distinct()

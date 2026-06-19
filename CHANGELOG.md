@@ -1,5 +1,17 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.54
+
+### Añadido
+- **Icono de aleatorio unificado**: nuevo vector `ic_shuffle_dynamic.xml` (con el diseño SVG aportado) expuesto como `ShuffleIcon`. Reemplaza todos los iconos de aleatorio previos (`Icons.Default.Shuffle` en Ajustes y `Icons.Outlined.Shuffle` en el Dashboard) para una imagen coherente en toda la app.
+- **Barra lateral — scrollbar**: la barra lateral principal (`MemoriaSidebar`) muestra una barra de desplazamiento vertical (`Modifier.verticalScrollbar`) que indica visualmente cuando hay más secciones de las visibles.
+- **Preferencias — volumen de vídeo**: nuevo slider "Volumen de video" dentro de la sección *Videos* (visible solo si el audio de vídeo no está silenciado). Escribe `SlideshowConfig.mediaVolume`, el mismo valor que usa el control de la reproducción → ambos controles quedan enlazados.
+- **Preferencias — colores por sección**: cada cabecera de sección (`SettingsSectionHeader`) tiene ahora un color de acento propio (Fotos azul, Videos naranja, Música verde, Slideshow morado, Visual teal, Reloj ámbar, TV índigo, Sistema gris) con barra lateral de color, icono y título tintados y fondo suave, para identificar de un vistazo en qué sección estás.
+
+### Actualizado
+- **Foco — entrar al contenido con flecha derecha**: al pulsar DERECHA desde el menú lateral, el foco entra siempre en el primer elemento focable de la sección. Se logra con `focusProperties { right = contentFocus }` en el menú y un `focusRequester` sobre el `focusGroup` del contenido, que reenvía al primer hijo focable. Comportamiento seguro (el requester siempre está adjunto), sin riesgo de crash.
+- **Audio enlazado en toda la app**: el volumen de música (`SlideshowViewModel.setMusicVolume`) ahora se persiste en `SlideshowConfig.musicVolume` además de aplicarse en vivo, y los sliders de música del slideshow leen `config.musicVolume`. Junto con el volumen de vídeo (`mediaVolume`), todos los controles de audio comparten la misma fuente y se reflejan en cualquier pantalla donde aparezcan.
+
 ## v0.1.53
 
 ### Corregido

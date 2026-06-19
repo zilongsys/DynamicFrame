@@ -70,7 +70,9 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun updateConfig(newConfig: SlideshowConfig) {
-        viewModelScope.launch { saveConfig(newConfig) }
+        // Se enruta por el use case con Mutex para serializar escrituras y evitar
+        // que dos guardados concurrentes se pisen (race condition en DataStore).
+        viewModelScope.launch { updateSlideshowConfig { newConfig } }
     }
 
     fun updateInterval(seconds: Int) {
@@ -84,6 +86,9 @@ class SettingsViewModel @Inject constructor(
     fun updateMusicVolume(volume: Float) {
         viewModelScope.launch { setMusicVolume(volume) }
     }
+
+    /** Volumen del audio de los vídeos del slideshow (config.mediaVolume). */
+    fun updateMediaVolume(volume: Float) = updateConfigField { it.copy(mediaVolume = volume) }
 
     fun toggleShuffle(enabled: Boolean) {
         viewModelScope.launch { setShuffle(enabled) }

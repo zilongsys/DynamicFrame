@@ -19,6 +19,7 @@ abstract class PlayerModule {
     abstract fun bindMusicPlaybackRepository(impl: MusicPlayerController): MusicPlaybackRepository
 
     @Binds
+    @Singleton
     abstract fun bindSlideshowVideoPlayerRepository(
         impl: ExoSlideshowVideoPlayerRepository
     ): SlideshowVideoPlayerRepository

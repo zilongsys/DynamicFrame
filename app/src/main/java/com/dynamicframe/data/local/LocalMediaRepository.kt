@@ -314,8 +314,13 @@ class LocalMediaRepository @Inject constructor(
                     }
                 }
                 "content" -> {
-                    val rows = contentResolver.delete(parsed, null, null)
-                    if (rows > 0) return@runCatching
+                    try {
+                        val rows = contentResolver.delete(parsed, null, null)
+                        if (rows > 0) return@runCatching
+                    } catch (e: SecurityException) {
+                        // Android 10+: borrar medios ajenos requiere confirmación del sistema.
+                        throw IOException("Este archivo requiere confirmación del sistema para borrarse.")
+                    }
                     val doc = DocumentFile.fromSingleUri(context, parsed)
                     if (doc != null && doc.delete()) return@runCatching
                     throw IOException("No se pudo borrar. Puede requerir permiso del sistema.")

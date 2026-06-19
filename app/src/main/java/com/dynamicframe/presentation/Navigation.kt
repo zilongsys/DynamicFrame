@@ -39,6 +39,7 @@ sealed class Screen(val route: String) {
 fun DynamicFrameNavHost(
     isTV: Boolean,
     debugViewModel: DebugViewModel,
+    autoStart: Boolean = false,
     navController: NavHostController = rememberNavController()
 ) {
     val activity = LocalContext.current as ComponentActivity
@@ -85,6 +86,15 @@ fun DynamicFrameNavHost(
         }
     }
 
+    // Auto-arranque tras reinicio (Android TV): abre el slideshow a pantalla completa.
+    LaunchedEffect(autoStart) {
+        if (autoStart) {
+            delay(800)
+            slideshowViewModel.startSlideshow(freshSession = true)
+            openFullscreen()
+        }
+    }
+
     NavHost(
         navController = navController,
         startDestination = Screen.Home.route
@@ -120,7 +130,8 @@ fun DynamicFrameNavHost(
                 },
                 requestMusicAccess = { onGranted ->
                     permissions.requestFor(MediaPermissionKind.MUSIC, onGranted)
-                }
+                },
+                onMediaChanged = { slideshowViewModel.reloadMedia() }
             )
         }
     }

@@ -188,14 +188,15 @@ class DataStoreSettingsRepository @Inject constructor(
         raw?.split("|")?.filter { it.isNotBlank() }?.toSet() ?: emptySet()
 
     private fun resolvePhotoFolders(prefs: Preferences): List<String> {
-        val explicit = splitList(prefs[Keys.PHOTO_FOLDERS])
-        if (explicit.isNotEmpty()) return explicit
+        // Si la clave existe (aunque esté vacía) el usuario ya tiene su lista explícita: respetarla.
+        // Solo se migra desde la clave legacy combinada (MEDIA_FOLDERS) si NUNCA se guardó la clave
+        // específica (config previa a la migración). Así una lista vacía no se rellena con la otra.
+        if (prefs[Keys.PHOTO_FOLDERS] != null) return splitList(prefs[Keys.PHOTO_FOLDERS])
         return migrateLegacyMediaFolders(prefs).first
     }
 
     private fun resolveVideoFolders(prefs: Preferences): List<String> {
-        val explicit = splitList(prefs[Keys.VIDEO_FOLDERS])
-        if (explicit.isNotEmpty()) return explicit
+        if (prefs[Keys.VIDEO_FOLDERS] != null) return splitList(prefs[Keys.VIDEO_FOLDERS])
         return migrateLegacyMediaFolders(prefs).second
     }
 

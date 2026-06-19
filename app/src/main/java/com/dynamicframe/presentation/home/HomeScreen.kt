@@ -20,10 +20,16 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
@@ -45,8 +51,8 @@ import com.dynamicframe.presentation.permissions.MediaPermissionState
 import com.dynamicframe.presentation.permissions.rememberMediaPermissions
 import com.dynamicframe.presentation.settings.SettingsScreen
 import com.dynamicframe.presentation.settings.SettingsViewModel
-import com.dynamicframe.presentation.settings.SettingsDropdownItem
 import com.dynamicframe.presentation.settings.SettingsSliderItem
+import com.dynamicframe.presentation.settings.SettingsSwitchItem
 import com.dynamicframe.presentation.settings.displayName
 import com.dynamicframe.presentation.device.HomeSection
 import com.dynamicframe.presentation.device.LocalDeviceProfile
@@ -72,6 +78,7 @@ import kotlinx.coroutines.delay
 import java.text.SimpleDateFormat
 import java.util.*
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun HomeScreen(
     isTV: Boolean,
@@ -84,6 +91,10 @@ fun HomeScreen(
     var destination by remember { mutableStateOf<MemoriaDestination>(MemoriaDestination.AlbumActive) }
 
     val device = LocalDeviceProfile.current
+    val sidebarSelectedFocus = remember { FocusRequester() }
+    // Foco del contenido: al pulsar DERECHA en el menú entra aquí y el focusGroup
+    // del contenido reenvía al primer elemento focable de la sección.
+    val contentFocus = remember { FocusRequester() }
 
     val slideshowState by slideshowViewModel.slideshowState.collectAsStateWithLifecycle()
     val config by slideshowViewModel.slideshowConfig.collectAsStateWithLifecycle()
@@ -127,6 +138,7 @@ fun HomeScreen(
                 musicState = musicState,
                 albumLabel = albumLabel,
                 showPermissionDenied = mediaPermissionDenied,
+                onGrantAccess = { activePermissions.requestFor(MediaPermissionKind.PHOTOS_VIDEOS) },
                 onOpenFullscreen = onOpenFullscreen,
                 onIntervalChange = settingsViewModel::updateInterval,
                 onTransitionChange = settingsViewModel::updateTransition,
@@ -151,7 +163,7 @@ fun HomeScreen(
             MemoriaDestination.Music -> MusicPanel(
                 config = settingsConfig,
                 musicState = musicState,
-                isPlaybackActive = slideshowState.isPlaying,
+                isPlaybackActive = musicState.isPlaying,
                 permissions = activePermissions,
                 settingsViewModel = settingsViewModel,
                 onUpdateConfig = settingsViewModel::updateConfig,
@@ -186,7 +198,9 @@ fun HomeScreen(
                 MemoriaSidebar(
                     selected = destination,
                     photoCount = slideshowState.totalItems,
-                    onSelect = { destination = it }
+                    onSelect = { destination = it },
+                    selectedItemFocus = sidebarSelectedFocus,
+                    contentFocus = contentFocus
                 )
                 Column(
                     modifier = Modifier
@@ -196,7 +210,24 @@ fun HomeScreen(
                             horizontal = device.contentPaddingH,
                             vertical = device.contentPaddingV
                         )
-                        .then(if (device.isTv) Modifier.focusGroup() else Modifier)
+                        .then(
+                            if (device.isTv) Modifier
+                                // Requester para que el menú (flecha DERECHA) entre aquí; el
+                                // focusGroup reenvía al primer elemento focable del contenido.
+                                .focusRequester(contentFocus)
+                                // Al salir del grupo por la IZQUIERDA, el foco vuelve SIEMPRE al
+                                // item seleccionado del menú (la sección a la que pertenece el
+                                // contenido). 'exit' es la API correcta para redirigir la salida
+                                // de un focusGroup (no 'left', que solo aplica a un focusable).
+                                .focusProperties {
+                                    exit = { direction ->
+                                        if (direction == FocusDirection.Left) sidebarSelectedFocus
+                                        else FocusRequester.Default
+                                    }
+                                }
+                                .focusGroup()
+                            else Modifier
+                        )
                 ) {
                     mainContent()
                 }
@@ -615,6 +646,9 @@ private fun ThumbnailCard(
             contentDescription = item.name,
             modifier = Modifier.fillMaxSize(),
             contentScale = ContentScale.Crop,
+            // Miniatura pequeña: acota decodificación para evitar OOM con fotos 4K+.
+            decodeWidth = 512,
+            decodeHeight = 512,
             crossfadeMillis = 300
         )
         if (item.type == MediaType.VIDEO) {
@@ -771,15 +805,32 @@ private fun DeviceActionButton(
     val useTvButton = device.isTv && !compact
     val size = if (compact) 40.dp else device.actionButtonSize
     val borderColor = if (destructive) NostalgiaAccent.copy(alpha = 0.5f) else PaperLine
-    val iconTint = if (destructive) NostalgiaAccent else PaperInk
+    val interactionSource = remember { MutableInteractionSource() }
+    val focused by interactionSource.collectIsFocusedAsState()
+    // Foco = relleno morado completo + contenido blanco.
+    val iconTint = when {
+        focused -> Color.White
+        destructive -> NostalgiaAccent
+        else -> PaperInk
+    }
+    val fillBg = when {
+        focused -> com.dynamicframe.ui.theme.MemoriaPurple
+        destructive -> PaperSelected
+        else -> PaperSurface
+    }
 
     if (useTvButton) {
         Row(
             modifier = Modifier
                 .clip(RoundedCornerShape(50))
-                .background(if (destructive) PaperSelected else PaperSurface)
-                .border(1.dp, borderColor, RoundedCornerShape(50))
-                .safeClickable(onClick = onClick)
+                .background(fillBg)
+                .then(if (focused) Modifier else Modifier.border(1.dp, borderColor, RoundedCornerShape(50)))
+                .safeClickable(
+                    interactionSource = interactionSource,
+                    showFocusBorder = false,
+                    focusScale = false,
+                    onClick = onClick
+                )
                 .padding(horizontal = 14.dp, vertical = 10.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(8.dp)
@@ -792,9 +843,14 @@ private fun DeviceActionButton(
             modifier = Modifier
                 .size(size)
                 .clip(CircleShape)
-                .background(if (destructive) PaperSelected else PaperSurface)
-                .border(1.dp, borderColor, CircleShape)
-                .safeClickable(onClick = onClick, showFocusBorder = false),
+                .background(fillBg)
+                .then(if (focused) Modifier else Modifier.border(1.dp, borderColor, CircleShape))
+                .safeClickable(
+                    interactionSource = interactionSource,
+                    showFocusBorder = false,
+                    focusScale = false,
+                    onClick = onClick
+                ),
             contentAlignment = Alignment.Center
         ) {
             Icon(icon, contentDescription = label, tint = iconTint, modifier = Modifier.size(22.dp))
@@ -958,18 +1014,28 @@ private fun MusicPanel(
         }
 
         item {
-            SettingsDropdownItem(
-                title = "Fuente",
-                icon = Icons.Default.LibraryMusic,
-                currentValue = config.musicSourceType.displayName(),
-                options = com.dynamicframe.domain.model.MusicSourceType.entries.map { it.displayName() },
-                onSelect = { idx ->
-                    onUpdateConfig(config.copy(musicSourceTypes = setOf(com.dynamicframe.domain.model.MusicSourceType.entries[idx])))
+            Column {
+                Text("Fuentes activas (combinables)", color = PaperMuted, fontSize = 13.sp,
+                    modifier = Modifier.padding(bottom = 4.dp))
+                listOf(
+                    com.dynamicframe.domain.model.MusicSourceType.DEVICE_LIBRARY,
+                    com.dynamicframe.domain.model.MusicSourceType.LOCAL_FOLDER
+                ).forEach { type ->
+                    SettingsSwitchItem(
+                        title = type.displayName(),
+                        icon = Icons.Default.LibraryMusic,
+                        checked = type in config.musicSourceTypes,
+                        onCheckedChange = {
+                            val cur = config.musicSourceTypes
+                            val newSet = if (type in cur && cur.size > 1) cur - type else cur + type
+                            onUpdateConfig(config.copy(musicSourceTypes = newSet))
+                        }
+                    )
                 }
-            )
+            }
         }
 
-        if (config.musicSourceType == com.dynamicframe.domain.model.MusicSourceType.LOCAL_FOLDER) {
+        if (com.dynamicframe.domain.model.MusicSourceType.LOCAL_FOLDER in config.musicSourceTypes) {
             item {
                 NostalgiaActionButton(
                     text = if (useInAppBrowser) "Añadir carpeta de música"

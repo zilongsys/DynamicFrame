@@ -22,12 +22,12 @@ class GetSlideshowItemsUseCase @Inject constructor(
             config.hasCustomMediaFolders() -> {
                 val items = mutableListOf<MediaItem>()
                 val photoFolders = foldersForAlbumSelection(
-                    config.photoFolderUris,
+                    config.activePhotoFolderUris(),
                     config.selectedAlbumIds,
                     MediaFolderKind.PHOTO
                 )
                 val videoFolders = foldersForAlbumSelection(
-                    config.videoFolderUris,
+                    config.activeVideoFolderUris(),
                     config.selectedAlbumIds,
                     MediaFolderKind.VIDEO
                 )
@@ -77,16 +77,23 @@ class GetMusicTracksUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(): Result<List<MusicTrack>> {
         val config = settingsRepository.getConfig()
-        return when (config.musicSourceType) {
-            MusicSourceType.LOCAL_FOLDER -> {
-                if (config.musicFolderUris.isEmpty()) Result.success(emptyList())
-                else musicRepository.getTracksFromFolders(config.musicFolderUris)
+        // Multi-fuente: fusiona las pistas de todas las fuentes activas.
+        val tracks = mutableListOf<MusicTrack>()
+        config.musicSourceTypes.forEach { source ->
+            val fromSource: List<MusicTrack> = when (source) {
+                MusicSourceType.LOCAL_FOLDER -> {
+                    val folders = config.activeMusicFolderUris()
+                    if (folders.isEmpty()) emptyList()
+                    else musicRepository.getTracksFromFolders(folders).getOrNull().orEmpty()
+                }
+                MusicSourceType.DEVICE_LIBRARY, MusicSourceType.THEME ->
+                    musicRepository.getLocalTracks().getOrNull().orEmpty()
+                MusicSourceType.SPOTIFY, MusicSourceType.YOUTUBE ->
+                    emptyList()
             }
-            MusicSourceType.DEVICE_LIBRARY, MusicSourceType.THEME ->
-                musicRepository.getLocalTracks()
-            MusicSourceType.SPOTIFY, MusicSourceType.YOUTUBE ->
-                Result.success(emptyList())
+            tracks.addAll(fromSource)
         }
+        return Result.success(tracks.distinctBy { it.id })
     }
 }
 

@@ -36,6 +36,7 @@ private val TvFocusColor = MemoriaPurple
 fun Modifier.tvClickable(
     enabled: Boolean = true,
     showFocusBorder: Boolean = true,
+    focusScale: Boolean = true,
     focusShape: Shape = RoundedCornerShape(12.dp),
     interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit
@@ -68,6 +69,8 @@ fun Modifier.tvClickable(
         )
         .then(
             when {
+                // Caller dibuja su propio relleno de foco → no añadir borde ni escalado.
+                !showFocusBorder && !focusScale -> Modifier
                 !showFocusBorder && focused -> Modifier.scale(1.06f)
                 showFocusBorder && focused -> Modifier.border(2.dp, TvFocusColor, focusShape)
                 else -> Modifier

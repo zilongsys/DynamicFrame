@@ -444,7 +444,7 @@ fun SlideshowScreen(
                                     TvVolumeStepper(
                                         label = "Volumen",
                                         icon = Icons.Default.VolumeUp,
-                                        value = musicState.volume,
+                                        value = config.musicVolume,
                                         onValueChange = viewModel::setMusicVolume,
                                         showLabel = false,
                                         horizontalKeysAdjustVolume = false,
@@ -460,7 +460,7 @@ fun SlideshowScreen(
                                         modifier = Modifier.size(18.dp)
                                     )
                                     Slider(
-                                        value = musicState.volume,
+                                        value = config.musicVolume,
                                         onValueChange = {
                                             viewModel.setMusicVolume(it)
                                         },

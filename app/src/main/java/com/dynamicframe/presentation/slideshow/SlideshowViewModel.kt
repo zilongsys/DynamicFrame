@@ -156,9 +156,18 @@ class SlideshowViewModel @Inject constructor(
         viewModelScope.launch { slideshowEngine.loadMedia() }
     }
 
-    fun setMusicVolume(volume: Float) = musicCoordinator.setVolume(volume)
+    /**
+     * Ajusta el volumen de la música. Se aplica en vivo Y se persiste en config
+     * para que quede enlazado con el mismo control en Ajustes/Inicio/Música.
+     */
+    fun setMusicVolume(volume: Float) {
+        musicCoordinator.setVolume(volume)
+        viewModelScope.launch {
+            updateSlideshowConfig { it.copy(musicVolume = volume) }
+        }
+    }
 
-    /** Ajusta el volumen del audio del vídeo en reproducción (0.0–1.0). */
+    /** Ajusta el volumen del audio del vídeo en reproducción (0.0–1.0). Persistido y enlazado. */
     fun setMediaVolume(volume: Float) {
         viewModelScope.launch {
             updateSlideshowConfig { it.copy(mediaVolume = volume) }

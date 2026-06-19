@@ -17,6 +17,7 @@ import com.dynamicframe.BuildConfig
 fun Modifier.safeClickable(
     enabled: Boolean = true,
     showFocusBorder: Boolean = true,
+    focusScale: Boolean = true,
     focusShape: Shape = RoundedCornerShape(12.dp),
     interactionSource: MutableInteractionSource? = null,
     onClick: () -> Unit
@@ -30,6 +31,7 @@ fun Modifier.safeClickable(
         tvClickable(
             enabled = enabled,
             showFocusBorder = showFocusBorder,
+            focusScale = focusScale,
             focusShape = focusShape,
             interactionSource = interactionSource,
             onClick = onClick

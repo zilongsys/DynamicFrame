@@ -1,6 +1,8 @@
 package com.dynamicframe.data.player
 
 import android.content.Context
+import androidx.media3.common.AudioAttributes
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
@@ -9,7 +11,9 @@ import com.dynamicframe.domain.repository.AppDebugLogger
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Inject
+import javax.inject.Singleton
 
+@Singleton
 class ExoSlideshowVideoPlayerRepository @Inject constructor(
     @ApplicationContext private val context: Context,
     private val debug: AppDebugLogger
@@ -19,12 +23,23 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
     private var attachedListener: Player.Listener? = null
     private var onEnded: (() -> Unit)? = null
     private var onError: (() -> Unit)? = null
+    private var currentUri: String? = null
 
     override val player: Player
         get() = obtainPlayer()
 
     private fun obtainPlayer(): ExoPlayer {
-        return exoPlayer ?: ExoPlayer.Builder(context).build().also { exoPlayer = it }
+        return exoPlayer ?: ExoPlayer.Builder(context).build().apply {
+            // Coordinación de audio: el vídeo no pide audio focus del sistema;
+            // la atenuación de la música se gestiona en la capa de dominio.
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                /* handleAudioFocus = */ false
+            )
+        }.also { exoPlayer = it }
     }
 
     override fun prepare(uri: String, volume: Float, mute: Boolean, playing: Boolean) {
@@ -37,10 +52,39 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
             p.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
             p.prepare()
             if (playing) p.play() else p.pause()
+            currentUri = uri
         }.onFailure {
             debug.e("Video", "prepare falló", it.message)
+            currentUri = null
             onError?.invoke()
         }
+    }
+
+    override fun setPlaying(playing: Boolean) {
+        runCatching {
+            val p = exoPlayer ?: return
+            if (playing) p.play() else p.pause()
+        }
+    }
+
+    override fun setVolume(volume: Float, mute: Boolean) {
+        runCatching {
+            exoPlayer?.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
+        }
+    }
+
+    override fun stop() {
+        runCatching {
+            exoPlayer?.let {
+                it.stop()
+                it.clearMediaItems()
+            }
+            currentUri = null
+        }
+    }
+
+    override fun stopIfCurrent(uri: String) {
+        if (currentUri == uri) stop()
     }
 
     override fun setListeners(onEnded: () -> Unit, onError: () -> Unit) {

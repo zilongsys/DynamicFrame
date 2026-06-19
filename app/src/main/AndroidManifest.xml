@@ -64,12 +64,16 @@
             </intent-filter>
         </service>
 
-        <!-- Boot receiver para autostart -->
+        <!-- Boot receiver para autostart (orientado a Android TV) -->
         <receiver
             android:name=".data.receiver.BootReceiver"
-            android:exported="true">
+            android:enabled="true"
+            android:exported="true"
+            android:directBootAware="true">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
 

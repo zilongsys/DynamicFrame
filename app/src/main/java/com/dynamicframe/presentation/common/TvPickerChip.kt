@@ -30,6 +30,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dynamicframe.ui.theme.FocusHintEffect
 import com.dynamicframe.ui.theme.MemoriaInk
+import com.dynamicframe.ui.theme.MemoriaLine
 import com.dynamicframe.ui.theme.MemoriaMuted
 import com.dynamicframe.ui.theme.MemoriaPurple
 import com.dynamicframe.ui.theme.MemoriaPurpleSoft
@@ -132,15 +133,15 @@ fun TvPickerChip(
         onDismiss = { dismissDialog() }
     )
 
-    val borderColor = if (focused) MemoriaPurple else Color.Transparent
-    val bg = if (focused) MemoriaPurpleSoft else MemoriaSurface
+    // Foco = relleno morado completo + contenido blanco (consistente en toda la app).
+    val bg = if (focused) MemoriaPurple else MemoriaSurface
 
     Box(
         modifier = modifier
             .height(chipHeight)
             .clip(shape)
             .background(bg, shape)
-            .border(2.dp, borderColor, shape)
+            .then(if (focused) Modifier else Modifier.border(1.dp, MemoriaLine, shape))
             .focusable(interactionSource = interactionSource)
             .onKeyEvent { event ->
                 if (!isSelectKey(event.key)) return@onKeyEvent false
@@ -188,13 +189,13 @@ fun TvPickerChip(
                 Icon(
                     icon,
                     contentDescription = title,
-                    tint = if (focused) MemoriaPurple else MemoriaMuted,
+                    tint = if (focused) Color.White else MemoriaMuted,
                     modifier = Modifier.size(16.dp)
                 )
                 Spacer(Modifier.height(2.dp))
                 Text(
                     displayValue,
-                    color = if (focused) MemoriaPurple else MemoriaInk,
+                    color = if (focused) Color.White else MemoriaInk,
                     fontSize = 11.sp,
                     fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
@@ -217,20 +218,23 @@ fun TvPickerChip(
                     Icon(
                         icon,
                         contentDescription = title,
-                        tint = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
+                        tint = if (focused) Color.White
+                        else MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f),
                         modifier = Modifier.size(22.dp)
                     )
-                    Text(text = title, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                    Text(text = title, fontSize = 15.sp, maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        color = if (focused) Color.White else MemoriaInk)
                 }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = displayValue,
-                        color = MaterialTheme.colorScheme.primary,
+                        color = if (focused) Color.White else MaterialTheme.colorScheme.primary,
                         fontSize = 14.sp,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    Icon(Icons.Default.ArrowDropDown, contentDescription = null)
+                    Icon(Icons.Default.ArrowDropDown, contentDescription = null,
+                        tint = if (focused) Color.White else MaterialTheme.colorScheme.onSurface)
                 }
             }
         }

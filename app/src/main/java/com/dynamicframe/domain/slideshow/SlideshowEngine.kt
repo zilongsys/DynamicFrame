@@ -36,6 +36,10 @@ class SlideshowEngine @Inject constructor(
     private var isInitialized = false
     private var lastMediaKey: String = ""
     private var lastScheduleKey: String = ""
+    /** Errores de reproducción consecutivos; evita bucle infinito si todos los medios fallan. */
+    private var consecutiveErrors = 0
+    /** Se incrementa en cada navegación para forzar el reinicio de un vídeo repetido. */
+    private var playTokenCounter = 0
 
     init {
         scope.launch {
@@ -43,7 +47,9 @@ class SlideshowEngine @Inject constructor(
                 val previousConfig = _config.value
                 _config.value = config
 
-                val mediaKey = "${config.photoFolderUris}|${config.videoFolderUris}|${config.mediaContentFilter}|${config.selectedAlbumIds}"
+                val mediaKey = "${config.photoFolderUris}|${config.videoFolderUris}|" +
+                    "${config.disabledPhotoFolderUris}|${config.disabledVideoFolderUris}|" +
+                    "${config.mediaContentFilter}|${config.selectedAlbumIds}"
                 if (mediaKey != lastMediaKey) {
                     lastMediaKey = mediaKey
                     if (isInitialized) loadMedia()
@@ -167,7 +173,8 @@ class SlideshowEngine @Inject constructor(
             currentIndex = startIndex,
             currentItem = item,
             isPlaying = true,
-            isTransitioning = false
+            isTransitioning = false,
+            playToken = ++playTokenCounter
         )
         preloadNext(startIndex)
         scheduleNext()
@@ -198,12 +205,14 @@ class SlideshowEngine @Inject constructor(
     }
 
     fun next() {
+        consecutiveErrors = 0
         val nextIdx = nextIndex() ?: return
         navigateTo(nextIdx)
     }
 
     fun previous() {
         if (shuffledItems.isEmpty()) return
+        consecutiveErrors = 0
         val currentIndex = _state.value.currentIndex
         val prevIndex = if (currentIndex > 0) currentIndex - 1 else shuffledItems.lastIndex
         navigateTo(prevIndex)
@@ -211,6 +220,7 @@ class SlideshowEngine @Inject constructor(
 
     fun jumpTo(index: Int) {
         if (shuffledItems.isEmpty()) return
+        consecutiveErrors = 0
         navigateTo(index.coerceIn(0, shuffledItems.lastIndex))
     }
 
@@ -251,13 +261,28 @@ class SlideshowEngine @Inject constructor(
     fun onVideoCompleted() {
         if (!_state.value.isPlaying) return
         if (!_config.value.videoPlayFull) return
+        consecutiveErrors = 0
         skipToNextOrPause()
     }
 
     /** Error de reproducción o carga: saltar al siguiente medio sin detener el slideshow. */
     fun onPlaybackError() {
         if (!_state.value.isPlaying) return
-        debug.w("Slideshow", "onPlaybackError → saltar", _state.value.currentItem?.uri)
+        consecutiveErrors++
+        debug.w("Slideshow", "onPlaybackError #$consecutiveErrors → saltar", _state.value.currentItem?.uri)
+
+        // Si han fallado tantos medios como hay en la lista, todos están rotos: parar.
+        if (shuffledItems.isNotEmpty() && consecutiveErrors >= shuffledItems.size) {
+            debug.e("Slideshow", "Todos los medios fallaron ($consecutiveErrors), pausando")
+            pause()
+            transitionJob?.cancel()
+            _state.value = _state.value.copy(
+                isTransitioning = false,
+                error = "No se pudieron reproducir los medios. Revisa las carpetas en Ajustes."
+            )
+            consecutiveErrors = 0
+            return
+        }
         skipToNextOrPause()
     }
 
@@ -278,6 +303,8 @@ class SlideshowEngine @Inject constructor(
         timerJob = scope.launch {
             delay(intervalMs)
             if (_state.value.isPlaying) {
+                // El medio actual se mostró durante todo el intervalo sin error → reset.
+                consecutiveErrors = 0
                 skipToNextOrPause()
             }
         }
@@ -297,7 +324,8 @@ class SlideshowEngine @Inject constructor(
             currentIndex = safeIndex,
             currentItem = item,
             nextItem = shuffledItems.getOrNull(nextIdx),
-            isTransitioning = true
+            isTransitioning = true,
+            playToken = ++playTokenCounter
         )
 
         val itemId = item.id

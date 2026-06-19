@@ -16,6 +16,14 @@ class SlideshowMusicCoordinator @Inject constructor(
 ) {
     val state get() = music.state
 
+    /** Si el aleatorio está activo, baraja la lista ANTES de reproducir y se reproduce en ese orden. */
+    private fun ordered(tracks: List<MusicTrack>, shuffle: Boolean): List<MusicTrack> =
+        if (shuffle) tracks.shuffled() else tracks
+
+    /** Compara por CONJUNTO de ids (no por orden): así una lista ya barajada no se considera obsoleta. */
+    private fun sameTracks(a: List<MusicTrack>, b: List<MusicTrack>): Boolean =
+        a.map { it.id }.toSet() == b.map { it.id }.toSet()
+
     suspend fun startForSession(freshSession: Boolean) {
         runCatching {
             val config = getConfig()
@@ -24,12 +32,9 @@ class SlideshowMusicCoordinator @Inject constructor(
 
             music.ensureConnected()
             if (freshSession) {
-                val startIndex = if (config.musicShuffle && tracks.isNotEmpty()) {
-                    tracks.indices.random()
-                } else {
-                    0
-                }
-                music.setPlaylist(tracks, startIndex = startIndex, autoPlay = true)
+                // Barajar la lista completa y empezar por el principio del orden ya barajado.
+                val playlist = ordered(tracks, config.musicShuffle)
+                music.setPlaylist(playlist, startIndex = 0, autoPlay = true)
                 music.setShuffle(config.musicShuffle)
             } else {
                 resumePlayback()
@@ -46,11 +51,10 @@ class SlideshowMusicCoordinator @Inject constructor(
 
             music.ensureConnected()
             val current = music.state.value
-            val playlistStale = current.playlist.isEmpty() ||
-                current.playlist.map { it.id } != tracks.map { it.id }
+            val playlistStale = current.playlist.isEmpty() || !sameTracks(current.playlist, tracks)
 
             if (playlistStale) {
-                music.setPlaylist(tracks, autoPlay = true)
+                music.setPlaylist(ordered(tracks, config.musicShuffle), autoPlay = true)
                 music.setShuffle(config.musicShuffle)
             } else if (!current.isPlaying) {
                 music.play()
@@ -66,7 +70,7 @@ class SlideshowMusicCoordinator @Inject constructor(
             if (tracks.isEmpty()) return@runCatching
 
             val playlistStale = music.state.value.playlist.isEmpty() ||
-                music.state.value.playlist.map { it.id } != tracks.map { it.id }
+                !sameTracks(music.state.value.playlist, tracks)
 
             if (!force && !playlistStale && !playAfter) {
                 music.setVolume(config.musicVolume)
@@ -74,7 +78,7 @@ class SlideshowMusicCoordinator @Inject constructor(
             }
 
             music.ensureConnected()
-            music.setPlaylist(tracks, autoPlay = playAfter)
+            music.setPlaylist(ordered(tracks, config.musicShuffle), autoPlay = playAfter)
             music.setVolume(config.musicVolume)
             music.setShuffle(config.musicShuffle)
         }
@@ -96,8 +100,9 @@ class SlideshowMusicCoordinator @Inject constructor(
     fun disconnect() = music.disconnect()
 
     fun musicConfigKey(
-        musicSourceType: com.dynamicframe.domain.model.MusicSourceType,
+        musicSourceTypes: Set<com.dynamicframe.domain.model.MusicSourceType>,
         musicFolderUris: List<String>,
+        disabledMusicFolderUris: Set<String>,
         musicShuffle: Boolean
-    ): String = "$musicSourceType|$musicFolderUris|$musicShuffle"
+    ): String = "$musicSourceTypes|$musicFolderUris|$disabledMusicFolderUris|$musicShuffle"
 }

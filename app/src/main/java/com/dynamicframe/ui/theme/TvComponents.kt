@@ -281,20 +281,28 @@ fun TvStepperChip(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val source = remember { MutableInteractionSource() }
+    val focused by source.collectIsFocusedAsState()
+    // Foco = relleno morado completo + icono blanco (consistente en toda la app).
+    val bg = if (focused) MemoriaPurple else MemoriaSurface
+    val iconTint = if (focused) Color.White else MemoriaInk
+
     Box(
         modifier = modifier
             .size(44.dp)
             .clip(CircleShape)
-            .border(1.dp, MemoriaLine, CircleShape)
-            .background(MemoriaSurface)
+            .background(bg)
+            .then(if (focused) Modifier else Modifier.border(1.dp, MemoriaLine, CircleShape))
             .safeClickable(
                 onClick = onClick,
                 showFocusBorder = false,
-                focusShape = CircleShape
+                focusScale = false,
+                focusShape = CircleShape,
+                interactionSource = source
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, desc, tint = MemoriaInk, modifier = Modifier.size(22.dp))
+        Icon(icon, desc, tint = iconTint, modifier = Modifier.size(22.dp))
     }
 }
 
