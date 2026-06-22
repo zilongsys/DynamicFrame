@@ -194,6 +194,12 @@ class MusicPlayerController @Inject constructor(
         _state.value = _state.value.copy(isDucked = false)
     }
 
+    override fun resetDuckedState() {
+        volumeBeforeVideo = null
+        wasPlayingBeforeVideo = false
+        _state.value = _state.value.copy(isDucked = false)
+    }
+
     private fun syncState() {
         controller?.let { ctrl ->
             val idx = ctrl.currentMediaItemIndex

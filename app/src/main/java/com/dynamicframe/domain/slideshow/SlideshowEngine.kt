@@ -152,6 +152,7 @@ class SlideshowEngine @Inject constructor(
     fun beginSession() {
         timerJob?.cancel()
         transitionJob?.cancel()
+        consecutiveErrors = 0
         if (mediaItems.isEmpty()) {
             debug.w("Slideshow", "beginSession: playlist vacía")
             _state.value = _state.value.copy(
@@ -229,7 +230,10 @@ class SlideshowEngine @Inject constructor(
     fun removeItem(itemId: String) {
         val removeIndex = _state.value.currentIndex
         mediaItems = mediaItems.filter { it.id != itemId }
-        shuffledItems = buildPlaylist(mediaItems, _config.value)
+        // Filtramos shuffledItems directamente para PRESERVAR el orden aleatorio actual.
+        // Si llamáramos a buildPlaylist() se volvería a barajar y el resto de la sesión
+        // cambiaría de orden de forma inesperada para el usuario.
+        shuffledItems = shuffledItems.filter { it.id != itemId }
 
         if (shuffledItems.isEmpty()) {
             timerJob?.cancel()
@@ -300,8 +304,18 @@ class SlideshowEngine @Inject constructor(
         }
 
         val intervalMs = _config.value.intervalSeconds * 1000L
+        // Si hay una transición en curso (navigateTo la marca como isTransitioning=true),
+        // esperar a que termine antes de empezar a contar el intervalo. Así el usuario
+        // ve cada foto el tiempo configurado sin que la transición "robe" tiempo de display.
+        // beginSession establece isTransitioning=false, por lo que el primer slide no
+        // acumula este retardo extra.
+        val transMs = if (_state.value.isTransitioning) {
+            transitionMillis(_config.value.transition, _config.value.transitionDurationMs)
+                .coerceAtLeast(0).toLong()
+        } else 0L
+
         timerJob = scope.launch {
-            delay(intervalMs)
+            delay(transMs + intervalMs)
             if (_state.value.isPlaying) {
                 // El medio actual se mostró durante todo el intervalo sin error → reset.
                 consecutiveErrors = 0

@@ -1,5 +1,17 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.55
+
+### Corregido
+- **Motor — `removeItem()` re-barajaba al borrar**: al eliminar un elemento durante la reproducción se llamaba a `buildPlaylist()` internamente, lo que volvía a barajar toda la lista y cambiaba el orden del resto de la sesión de forma inesperada. Ahora se filtra directamente `shuffledItems` preservando el orden establecido al inicio de sesión.
+- **Vídeo — flash negro al llamar `prepare()`**: `ExoSlideshowVideoPlayerRepository.prepare()` llamaba a `stop()` + `clearMediaItems()` justo antes de `setMediaItem()`, dejando el player en `STATE_IDLE` y causando un parpadeo negro hasta que `prepare()` completaba. Eliminadas esas dos llamadas; con `setMediaItem()` directo ExoPlayer hace un seek-to-start implícito sin interrumpir el display.
+- **Música — estado `isDucked` colgado tras reanudar**: si la sesión se interrumpía mientras se reproducía un vídeo (modo pausa/app en background), el flag `isDucked` permanecía `true` al reanudar. La siguiente llamada a `setVolume()` sobrescribía `volumeBeforeVideo` con el volumen ya atenuado, bloqueando la restauración del volumen. `SlideshowMusicCoordinator.resumePlayback()` ahora llama a `music.resetDuckedState()` antes de restaurar el volumen si detecta `isDucked=true`.
+- **ViewModel — `musicCoordinator.disconnect()` nunca se llamaba**: al destruirse el `SlideshowViewModel` (rotación, navegación) el `MediaController` de música no se liberaba, acumulando callbacks huérfanos. Se añade `musicCoordinator.disconnect()` en `onCleared()` antes de `slideshowVideoPlayer.release()`.
+- **Transición KEN_BURNS invisible**: `initialScale = 1.0f` no produce diferencia de escala y la animación era idéntica a un fade simple. Corregido a `0.92f` para que la imagen entre ligeramente pequeña y crezca, logrando el efecto zoom visible.
+
+### Añadido
+- **`MusicPlaybackRepository.resetDuckedState()`**: nueva función de interfaz que limpia el estado de atenuación/pausa por vídeo sin restaurar el volumen (a diferencia de `onPhotoShown` que sí restaura). Implementada en `MusicPlayerController`.
+
 ## v0.1.54
 
 ### Añadido

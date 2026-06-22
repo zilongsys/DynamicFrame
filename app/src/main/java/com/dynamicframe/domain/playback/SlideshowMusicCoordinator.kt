@@ -50,6 +50,11 @@ class SlideshowMusicCoordinator @Inject constructor(
             if (tracks.isEmpty()) return@runCatching
 
             music.ensureConnected()
+            // Si la sesión fue interrumpida durante un vídeo (isDucked=true), el estado
+            // de atenuación quedó colgado. Lo limpiamos ANTES de restaurar el volumen
+            // para que setVolume() no piense que sigue en modo duck y sobrescriba volumeBeforeVideo.
+            if (music.state.value.isDucked) music.resetDuckedState()
+
             val current = music.state.value
             val playlistStale = current.playlist.isEmpty() || !sameTracks(current.playlist, tracks)
 

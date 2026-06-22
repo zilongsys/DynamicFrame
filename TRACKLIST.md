@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Auditoría núcleo: 5 bugs corregidos (v0.1.55)
+- Estado: Completado (v0.1.55)
+- Descripción: (1) `removeItem()` ya no re-baraja la playlist al borrar un ítem. (2) `prepare()` en ExoPlayer elimina `stop()+clearMediaItems()` para evitar flash negro. (3) `isDucked` stale: `resumePlayback()` limpia el estado de duck antes de restaurar volumen. (4) `musicCoordinator.disconnect()` añadido a `onCleared()`. (5) KEN_BURNS: `initialScale` corregido de 1.0f a 0.92f para que la animación sea visible.
+
 ## 2026-06-17 — General: scrollbar lateral, foco al entrar, icono shuffle, volumen vídeo enlazado, colores por sección
 - Estado: Completado (v0.1.54)
 - Descripción: (1) Scrollbar en la barra lateral principal (`Modifier.verticalScrollbar`). (2) Al pulsar flecha derecha desde el menú el foco entra al primer elemento focable de la sección (`focusProperties { right = contentFocus }` + `focusRequester` sobre el `focusGroup` del contenido). (3) Nuevo icono de aleatorio unificado a partir del SVG aportado (`ic_shuffle_dynamic` / `ShuffleIcon`), reemplaza todos los random de Ajustes y Dashboard. (4) Control de volumen de vídeo en Preferencias (sección Videos) enlazado con el de reproducción vía `config.mediaVolume`; volumen de música también persistido en `config.musicVolume` para enlazar todas sus instancias. (5) Colores de acento por sección en Preferencias para identificar visualmente dónde estás.

@@ -26,5 +26,8 @@ interface MusicPlaybackRepository {
 
     fun onPhotoShown(normalVolume: Float)
 
+    /** Limpia el estado de atenuación/pausa por vídeo sin restaurar volumen (p.ej. al reanudar sesión). */
+    fun resetDuckedState()
+
     fun disconnect()
 }

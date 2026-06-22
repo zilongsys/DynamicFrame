@@ -39,7 +39,9 @@ fun AnimatedContentTransitionScope<MediaItem>.slideshowTransitionSpec(
         }
 
         TransitionType.KEN_BURNS -> {
-            (fadeIn(enterTween) + scaleIn(initialScale = 1.0f, animationSpec = tween(ms, easing = LinearEasing)))
+            // initialScale = 0.92f: la imagen entra ligeramente pequeña y crece → efecto zoom.
+            // Con 1.0f no hay diferencia de escala y la animación es invisible.
+            (fadeIn(enterTween) + scaleIn(initialScale = 0.92f, animationSpec = tween(ms, easing = LinearEasing)))
                 .togetherWith(fadeOut(exitTween))
         }
 

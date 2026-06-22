@@ -46,8 +46,10 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
         debug.d("Video", "prepare playing=$playing mute=$mute uri=${uri.takeLast(48)}")
         runCatching {
             val p = obtainPlayer()
-            p.stop()
-            p.clearMediaItems()
+            // No llamamos stop()+clearMediaItems() antes de setMediaItem(): hacerlo provoca
+            // un breve flash negro al cambiar de vídeo porque el player queda en STATE_IDLE
+            // hasta que prepare() termina. Con setMediaItem() directo ExoPlayer hace un
+            // seek-to-start implícito y empieza a decodificar sin interrumpir el display.
             p.setMediaItem(MediaItem.fromUri(uri))
             p.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
             p.prepare()

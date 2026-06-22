@@ -223,6 +223,7 @@ class SlideshowViewModel @Inject constructor(
     }
 
     override fun onCleared() {
+        musicCoordinator.disconnect()
         slideshowVideoPlayer.release()
         super.onCleared()
     }
