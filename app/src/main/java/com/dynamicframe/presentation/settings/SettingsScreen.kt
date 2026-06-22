@@ -578,6 +578,18 @@ fun SettingsScreen(
                 )
             }
             item {
+                SettingsDropdownItem(
+                    title = "Tema de la interfaz",
+                    icon = Icons.Default.Style,
+                    currentValue = config.playbackTheme.playbackThemeDisplayName(),
+                    options = PlaybackTheme.entries.map { it.playbackThemeDisplayName() },
+                    note = "Estilo de los controles en pantalla completa: Aurora Glass (HUD moderno), Ambiente (mínimo) o Galería (riel lateral con placa).",
+                    onSelect = { idx ->
+                        viewModel.updateConfig(config.copy(playbackTheme = PlaybackTheme.entries[idx]))
+                    }
+                )
+            }
+            item {
                 SettingsSwitchItem(
                     title = "Marco dorado (estilo cuadro)",
                     icon = Icons.Default.FilterFrames,
@@ -1093,6 +1105,12 @@ fun MusicTheme.displayName() = when (this) {
 fun VideoMusicBehavior.displayName() = when (this) {
     VideoMusicBehavior.PAUSE -> "Pausar música"
     VideoMusicBehavior.DUCK -> "Bajar volumen"
+}
+
+fun PlaybackTheme.playbackThemeDisplayName() = when (this) {
+    PlaybackTheme.AURORA_GLASS -> "Aurora Glass (recomendado)"
+    PlaybackTheme.AMBIENT -> "Ambiente (minimalista)"
+    PlaybackTheme.GALLERY -> "Galería (museo)"
 }
 
 /**

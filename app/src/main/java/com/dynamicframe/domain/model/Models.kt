@@ -130,7 +130,9 @@ data class SlideshowConfig(
     /** Fondo detrás de fotos/vídeos (letterbox) */
     val playbackBackgroundType: PlaybackBackgroundType = PlaybackBackgroundType.DEMO_LAVENDER,
     /** URI de imagen personalizada para fondo (si type = CUSTOM_IMAGE) */
-    val playbackBackgroundImageUri: String = ""
+    val playbackBackgroundImageUri: String = "",
+    /** Estilo de interfaz (tema) de la pantalla de reproducción */
+    val playbackTheme: PlaybackTheme = PlaybackTheme.AURORA_GLASS
 ) {
     /** Compatibilidad: primera fuente activa, o DEVICE_LIBRARY si no hay ninguna */
     val musicSourceType: MusicSourceType
@@ -157,6 +159,18 @@ enum class PlaybackBackgroundType {
     DEMO_SUNSET,
     DEMO_MIDNIGHT,
     CUSTOM_IMAGE
+}
+
+/**
+ * Estilo de interfaz de la pantalla de reproducción.
+ * - [AURORA_GLASS]: glassmorphism unificado con HUD inferior (por defecto).
+ * - [AMBIENT]: minimalismo cinematográfico, controles mínimos centrados.
+ * - [GALLERY]: marco editorial tipo museo, riel lateral + placa de datos.
+ */
+enum class PlaybackTheme {
+    AURORA_GLASS,
+    AMBIENT,
+    GALLERY
 }
 
 enum class TransitionType {

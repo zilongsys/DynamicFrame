@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Pantalla de reproducción: 3 temas de interfaz seleccionables (Aurora Glass por defecto)
+- Estado: Completado (v0.1.56)
+- Descripción: Tras analizar la pantalla de reproducción y proponer 3 estilos con mockups, se implementan los 3 como temas elegibles (enum `PlaybackTheme`, persistido en DataStore): Aurora Glass (HUD glass, por defecto), Ambiente (minimalista con scrim) y Galería (riel lateral + placa de datos). Selector en Ajustes → Visual. Nuevo `PlaybackControlThemes.kt` con dispatcher `PlaybackControlsOverlay` y modelo `PlaybackControlsCallbacks`. Además se arreglan bugs comunes: auto-ocultado de controles (TV no ocultaba si el foco no estaba en play/pausa; móvil ocultaba a mitad de gesto), estado vacío engañoso y reentrancia del formateador del reloj.
+
 ## 2026-06-22 — Auditoría núcleo: 5 bugs corregidos (v0.1.55)
 - Estado: Completado (v0.1.55)
 - Descripción: (1) `removeItem()` ya no re-baraja la playlist al borrar un ítem. (2) `prepare()` en ExoPlayer elimina `stop()+clearMediaItems()` para evitar flash negro. (3) `isDucked` stale: `resumePlayback()` limpia el estado de duck antes de restaurar volumen. (4) `musicCoordinator.disconnect()` añadido a `onCleared()`. (5) KEN_BURNS: `initialScale` corregido de 1.0f a 0.92f para que la animación sea visible.

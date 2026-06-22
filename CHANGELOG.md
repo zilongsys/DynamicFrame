@@ -1,5 +1,23 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.56
+
+### Añadido
+- **Temas de interfaz para la pantalla de reproducción**: nuevo enum `PlaybackTheme` con tres estilos seleccionables, persistidos en DataStore (`playback_theme`) y elegibles en Ajustes → *Visual en reproducción* → "Tema de la interfaz":
+  - **Aurora Glass** (por defecto): HUD inferior glassmorphism unificado con álbumes, progreso, transporte y volúmenes (el diseño previo, extraído a su propio tema).
+  - **Ambiente**: minimalismo cinematográfico — barra inferior mínima centrada (anterior · play/pausa grande con glow morado · siguiente) sobre un scrim degradado, acciones discretas arriba a la derecha.
+  - **Galería**: estilo museo — riel vertical de controles acoplado a la derecha y una "placa" inferior con fecha, álbum y posición del elemento actual.
+- Los controles de los 3 temas comparten un único modelo de acciones (`PlaybackControlsCallbacks`) y los componentes existentes, manteniendo coherencia y el foco D-pad.
+
+### Corregido
+- **Auto-ocultado de controles roto en TV**: antes los controles solo se ocultaban si el foco estaba en el botón play/pausa; si estaba en cualquier otro control no se ocultaban nunca. Ahora se ocultan tras 6 s de inactividad (5 s en móvil) y el temporizador se reinicia con cualquier interacción (navegación de foco, click o ajuste de volumen) mediante un contador `interactionTick`.
+- **Controles desaparecían a mitad de gesto en móvil**: el temporizador fijo de 5 s ocultaba los controles aunque el usuario estuviera arrastrando un slider. Ahora cualquier interacción reinicia la cuenta.
+- **Estado vacío engañoso**: si no hay medios, en vez de quedarse en "Preparando fotos…" indefinidamente, muestra "No hay fotos ni vídeos. Añade carpetas en Ajustes." cuando `totalItems == 0`.
+- **Reloj de reproducción**: `SimpleDateFormat`/`Locale` se creaban en cada tick del bucle (cada segundo); ahora se instancian una sola vez fuera del bucle.
+
+### Refactor
+- `SlideshowScreen` (≈630 líneas) deja de tener el overlay de controles embebido: ahora delega en `PlaybackControlsOverlay` (nuevo `PlaybackControlThemes.kt`), quedando como orquestador de estado, render de contenido, reloj y foco.
+
 ## v0.1.55
 
 ### Corregido
