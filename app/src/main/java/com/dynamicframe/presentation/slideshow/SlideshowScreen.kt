@@ -3,6 +3,7 @@ package com.dynamicframe.presentation.slideshow
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
@@ -16,6 +17,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.draw.clip
 import com.dynamicframe.domain.model.PlaybackTheme
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
@@ -305,14 +308,33 @@ fun SlideshowScreen(
                 PlaybackTheme.GALLERY -> "Galería"
                 else -> "Aurora Glass"
             }
-            GlassSurface(cornerRadius = 12.dp) {
-                Text(
-                    text = "Tema: $themeName · ${AppVersion.shortLabel()}",
-                    color = GlassText,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
-                )
+            when (config.playbackTheme) {
+                PlaybackTheme.AURORA_GLASS -> {
+                    Row(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(Color(0xCC081220))
+                            .border(1.dp, AuroraGlassBorder, RoundedCornerShape(12.dp))
+                            .padding(horizontal = 14.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "Tema: $themeName · ${AppVersion.shortLabel()}",
+                            color = AuroraText,
+                            fontSize = 13.sp,
+                            fontWeight = FontWeight.Medium
+                        )
+                    }
+                }
+                else -> GlassSurface(cornerRadius = 12.dp) {
+                    Text(
+                        text = "Tema: $themeName · ${AppVersion.shortLabel()}",
+                        color = GlassText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                    )
+                }
             }
         }
 
@@ -324,10 +346,16 @@ fun SlideshowScreen(
                 .align(Alignment.TopCenter)
                 .padding(top = 16.dp)
         ) {
-            FrameModeClockTop(
-                time = currentTime,
-                date = if (config.showDate) currentDate else null
-            )
+            when (config.playbackTheme) {
+                PlaybackTheme.AURORA_GLASS -> AuroraClockTop(
+                    time = currentTime,
+                    date = if (config.showDate) currentDate else null
+                )
+                else -> FrameModeClockTop(
+                    time = currentTime,
+                    date = if (config.showDate) currentDate else null
+                )
+            }
         }
 
         // Aurora Glass: controles solo al pulsar OK/tocar (auto-ocultado).

@@ -1,5 +1,14 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.61
+
+### Actualizado
+- **Aurora Glass rediseñado para coincidir con el mockup** (ya no reutiliza la UI genérica de Ajustes):
+  - Nuevo `AuroraGlassComponents.kt`: paleta cyan eléctrico (`#00E5FF`) sobre cristal oscuro, HUD con borde degradado, botones circulares superiores, play central con **halo cyan** (no morado MemoriaPurple).
+  - **Eliminados los steppers 40%/100%** (`TvVolumeStepper`) del HUD de reproducción; sustituidos por **sliders finos** (`AuroraGlassVolumeSlider`) en una sola fila con transporte.
+  - Píldoras de álbum, barra de progreso cyan, chip de música y reloj con estilo Aurora coherente.
+  - Panel inferior compacto: transporte + volumen + música en **una fila** (como el mockup), no dos cajas apiladas.
+
 ## v0.1.60
 
 ### Corregido

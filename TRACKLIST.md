@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Aurora Glass fiel al mockup (eliminar steppers 40%/100% y morado genérico)
+- Estado: Completado (v0.1.61)
+- Descripción: Captura del usuario confirma que Aurora Glass cargaba pero se veía como UI genérica (panel blanco, botón play morado, steppers TvVolumeStepper 40%/100%). Rediseño completo con `AuroraGlassComponents.kt`: cyan eléctrico, halo en play, sliders finos, HUD oscuro, botones circulares, progreso cyan, reloj Aurora.
+
 ## 2026-06-22 — Temas Ambiente/Galería siempre visibles (fix raíz controles ocultos)
 - Estado: Completado (v0.1.60)
 - Descripción: El usuario confirmó que el badge de tema aparece pero los controles no cambian. Causa raíz: toda la UI temática estaba dentro de `AnimatedVisibility(showControls=false)` — sin pulsar OK solo se veía la foto. Ambiente y Galería ahora muestran su interfaz siempre (como los mockups); Aurora Glass mantiene auto-ocultado. Badge incluye versión para verificar build.

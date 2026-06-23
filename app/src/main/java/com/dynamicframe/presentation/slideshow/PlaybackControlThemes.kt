@@ -11,8 +11,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
 import androidx.compose.material3.LinearProgressIndicator
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -42,14 +40,7 @@ import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.SlideshowState
 import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.ui.theme.FocusHintEffect
-import com.dynamicframe.ui.theme.GlassAlbumPillRow
-import com.dynamicframe.ui.theme.GlassCircleButton
-import com.dynamicframe.ui.theme.GlassIconButton
-import com.dynamicframe.ui.theme.GlassSurface
-import com.dynamicframe.ui.theme.GlassText
-import com.dynamicframe.ui.theme.GlassTextMuted
 import com.dynamicframe.ui.theme.MemoriaPurple
-import com.dynamicframe.ui.theme.TvVolumeStepper
 import com.dynamicframe.ui.theme.safeClickable
 import com.dynamicframe.ui.theme.tvFocusRequester
 import java.text.SimpleDateFormat
@@ -105,7 +96,7 @@ fun PlaybackControlsOverlay(
     }
 }
 
-// ── Tema C · Aurora Glass (por defecto) ───────────────────────────────────────
+// ── Tema C · Aurora Glass (HUD cyan glassmorphism — mockup) ────────────────────
 
 @Composable
 private fun AuroraGlassControls(
@@ -120,59 +111,55 @@ private fun AuroraGlassControls(
     bottomBarFocus: FocusRequester,
     cb: PlaybackControlsCallbacks
 ) {
-    val device = LocalDeviceProfile.current
     Box(modifier = Modifier.fillMaxSize()) {
+        // Barra superior: chip de música (izq) + acciones circulares (der)
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
                 .fillMaxWidth()
-                .padding(horizontal = 20.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 18.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (musicState.currentTrack != null && config.playbackShowOverlay) {
-                PlaybackMusicChip(
-                    title = musicState.currentTrack?.title,
-                    artist = musicState.currentTrack?.artist,
+                AuroraMusicChip(
+                    title = musicState.currentTrack!!.title,
+                    artist = musicState.currentTrack!!.artist,
                     isPlaying = musicState.isPlaying
                 )
             } else {
                 Spacer(Modifier.width(1.dp))
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 cb.onBack?.let {
-                    GlassIconButton(
+                    AuroraHudIconButton(
                         icon = Icons.Default.ArrowBack,
                         contentDescription = "Volver",
-                        label = if (device.isTv) "Inicio" else "Volver",
                         hintDescription = "Volver al panel principal",
                         onFocusHint = cb.setControlHint,
                         onClick = it
                     )
                 }
                 if (slideshowState.currentItem != null) {
-                    GlassIconButton(
+                    AuroraHudIconButton(
                         icon = Icons.Default.DeleteOutline,
                         contentDescription = "Borrar",
-                        label = if (device.isTv) "Borrar" else null,
                         hintDescription = "Borrar la foto o vídeo actual",
                         onFocusHint = cb.setControlHint,
                         onClick = cb.onDelete
                     )
                 }
-                GlassIconButton(
+                AuroraHudIconButton(
                     icon = Icons.Default.Settings,
-                    contentDescription = "Configuración",
-                    label = if (device.isTv) "Configuración" else "Ajustes",
+                    contentDescription = "Ajustes",
                     hintDescription = "Abrir ajustes de la app",
                     onFocusHint = cb.setControlHint,
-                    onClick = cb.onOpenSettings,
-                    prominent = true
+                    onClick = cb.onOpenSettings
                 )
             }
         }
 
-        CenterPlayPauseButton(
+        AuroraCenterPlayButton(
             isPlaying = slideshowState.isPlaying,
             onClick = cb.onPlayPause,
             modifier = pauseDpadModifier(isTV, pauseFocus, bottomBarFocus).align(Alignment.Center),
@@ -182,154 +169,107 @@ private fun AuroraGlassControls(
         )
 
         if (config.playbackShowOverlay) {
-            Column(
+            AuroraGlassHud(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp, vertical = 18.dp)
             ) {
-                GlassSurface(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 20.dp),
-                    cornerRadius = 28.dp
+                if (pills.size > 1) {
+                    Text(
+                        text = "Álbumes",
+                        color = AuroraTextMuted,
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Medium,
+                        letterSpacing = 0.5.sp
+                    )
+                    AuroraAlbumPillRow(
+                        pills = pills,
+                        selectedId = selectedAlbumId,
+                        onSelect = cb.onSelectAlbum
+                    )
+                }
+
+                if (slideshowState.totalItems > 0) {
+                    val slideProgress =
+                        (slideshowState.currentIndex + 1).toFloat() / slideshowState.totalItems
+                    AuroraProgressRow(
+                        progress = slideProgress,
+                        label = "${slideshowState.currentIndex + 1} / ${slideshowState.totalItems}"
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Column(modifier = Modifier.fillMaxWidth()) {
-                        if (pills.size > 1) {
-                            Text(
-                                text = "Álbumes",
-                                color = GlassTextMuted,
-                                fontSize = 12.sp,
-                                fontWeight = FontWeight.Medium,
-                                modifier = Modifier.padding(bottom = 8.dp)
-                            )
-                            GlassAlbumPillRow(
-                                pills = pills,
-                                selectedId = selectedAlbumId,
-                                onSelect = cb.onSelectAlbum
-                            )
-                            Spacer(Modifier.height(14.dp))
-                        }
+                    AuroraTransportButton(
+                        icon = Icons.Default.Replay,
+                        contentDescription = "Reiniciar",
+                        hintDescription = "Reiniciar desde el principio",
+                        onFocusHint = cb.setControlHint,
+                        onClick = cb.onRestart
+                    )
+                    AuroraTransportButton(
+                        icon = Icons.Default.SkipPrevious,
+                        contentDescription = "Anterior",
+                        hintDescription = "Foto o vídeo anterior",
+                        onFocusHint = cb.setControlHint,
+                        modifier = if (isTV) Modifier.focusRequester(bottomBarFocus) else Modifier,
+                        onClick = cb.onPrevious
+                    )
+                    AuroraTransportButton(
+                        icon = Icons.Default.SkipNext,
+                        contentDescription = "Siguiente",
+                        hintDescription = "Foto o vídeo siguiente",
+                        onFocusHint = cb.setControlHint,
+                        onClick = cb.onNext
+                    )
+                    AuroraGlassVolumeSlider(
+                        value = config.musicVolume,
+                        onValueChange = cb.onMusicVolume,
+                        icon = Icons.Default.VolumeUp,
+                        hintDescription = "Volumen música · ← → ajustar",
+                        onFocusHint = cb.setControlHint,
+                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                    )
+                    AuroraTransportButton(
+                        icon = if (musicState.isPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
+                        contentDescription = "Música",
+                        hintDescription = if (musicState.isPlaying) "Pausar música" else "Reanudar música",
+                        onFocusHint = cb.setControlHint,
+                        onClick = cb.onToggleMusic
+                    )
+                    AuroraTransportButton(
+                        icon = Icons.Default.FastForward,
+                        contentDescription = "Siguiente canción",
+                        hintDescription = "Saltar a la siguiente pista",
+                        onFocusHint = cb.setControlHint,
+                        onClick = cb.onSkipTrack
+                    )
+                }
 
-                        if (slideshowState.totalItems > 0) {
-                            val slideProgress =
-                                (slideshowState.currentIndex + 1).toFloat() / slideshowState.totalItems
-                            LinearProgressIndicator(
-                                progress = slideProgress,
-                                modifier = Modifier.fillMaxWidth(),
-                                color = Color.White.copy(alpha = 0.9f),
-                                trackColor = Color.White.copy(alpha = 0.2f)
-                            )
-                            Spacer(Modifier.height(4.dp))
-                            Text(
-                                text = "${slideshowState.currentIndex + 1} / ${slideshowState.totalItems}",
-                                color = GlassTextMuted,
-                                fontSize = 12.sp,
-                                modifier = Modifier.align(Alignment.End)
-                            )
-                        }
+                val currentForVol = slideshowState.currentItem
+                if (currentForVol?.type == MediaType.VIDEO && !config.muteVideoAudio) {
+                    AuroraGlassVolumeSlider(
+                        value = config.mediaVolume,
+                        onValueChange = cb.onMediaVolume,
+                        icon = Icons.Default.Movie,
+                        hintDescription = "Volumen vídeo · ← → ajustar",
+                        onFocusHint = cb.setControlHint,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
-                        Spacer(Modifier.height(12.dp))
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
-                                GlassCircleButton(
-                                    icon = Icons.Default.Replay,
-                                    contentDescription = "Reiniciar reproducción",
-                                    hintDescription = "Reiniciar desde el principio (aplica aleatorio si está activo)",
-                                    onFocusHint = cb.setControlHint,
-                                    onClick = cb.onRestart
-                                )
-                                GlassCircleButton(
-                                    icon = Icons.Default.SkipPrevious,
-                                    contentDescription = "Anterior",
-                                    hintDescription = "Foto o vídeo anterior",
-                                    onFocusHint = cb.setControlHint,
-                                    modifier = if (isTV) Modifier.focusRequester(bottomBarFocus) else Modifier,
-                                    onClick = cb.onPrevious
-                                )
-                                GlassCircleButton(
-                                    icon = Icons.Default.SkipNext,
-                                    contentDescription = "Siguiente",
-                                    hintDescription = "Foto o vídeo siguiente",
-                                    onFocusHint = cb.setControlHint,
-                                    onClick = cb.onNext
-                                )
-                            }
-
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp),
-                                modifier = Modifier.weight(1f).padding(start = 12.dp)
-                            ) {
-                                VolumeControl(
-                                    isTV = isTV,
-                                    icon = Icons.Default.VolumeUp,
-                                    label = "Volumen",
-                                    value = config.musicVolume,
-                                    onValueChange = cb.onMusicVolume,
-                                    hint = "Volumen música. ↑ ↓ ajustar · ← → cambiar botón",
-                                    setControlHint = cb.setControlHint,
-                                    modifier = Modifier.weight(1f)
-                                )
-                                GlassCircleButton(
-                                    icon = if (musicState.isPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
-                                    contentDescription = "Música",
-                                    hintDescription = if (musicState.isPlaying) "Pausar música" else "Reanudar música",
-                                    onFocusHint = cb.setControlHint,
-                                    onClick = cb.onToggleMusic
-                                )
-                                GlassCircleButton(
-                                    icon = Icons.Default.FastForward,
-                                    contentDescription = "Siguiente canción",
-                                    hintDescription = "Saltar a la siguiente pista",
-                                    onFocusHint = cb.setControlHint,
-                                    onClick = cb.onSkipTrack
-                                )
-                            }
-                        }
-
-                        val currentForVol = slideshowState.currentItem
-                        if (currentForVol?.type == MediaType.VIDEO && !config.muteVideoAudio) {
-                            Spacer(Modifier.height(8.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(4.dp)
-                            ) {
-                                Icon(
-                                    Icons.Default.Movie,
-                                    contentDescription = null,
-                                    tint = GlassTextMuted,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                VolumeControl(
-                                    isTV = isTV,
-                                    icon = Icons.Default.Movie,
-                                    label = "Vol. vídeo",
-                                    value = config.mediaVolume,
-                                    onValueChange = cb.onMediaVolume,
-                                    hint = "Volumen del audio del vídeo. ↑ ↓ ajustar · ← → cambiar botón",
-                                    setControlHint = cb.setControlHint,
-                                    modifier = Modifier.weight(1f)
-                                )
-                            }
-                        }
-
-                        if (isTV) {
-                            Spacer(Modifier.height(8.dp))
-                            Text(
-                                text = controlHint,
-                                color = GlassTextMuted,
-                                fontSize = 11.sp,
-                                modifier = Modifier.fillMaxWidth(),
-                                textAlign = TextAlign.Center,
-                                maxLines = 2
-                            )
-                        }
-                    }
+                if (isTV) {
+                    Text(
+                        text = controlHint,
+                        color = AuroraTextMuted.copy(alpha = 0.7f),
+                        fontSize = 10.sp,
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center,
+                        maxLines = 2
+                    )
                 }
             }
         }
@@ -690,78 +630,6 @@ private fun pauseDpadModifier(
         .focusProperties { down = bottomBarFocus }
 } else {
     Modifier
-}
-
-/** Control de volumen unificado: stepper en TV, slider en móvil. */
-@Composable
-private fun VolumeControl(
-    isTV: Boolean,
-    icon: ImageVector,
-    label: String,
-    value: Float,
-    onValueChange: (Float) -> Unit,
-    hint: String,
-    setControlHint: (String) -> Unit,
-    modifier: Modifier = Modifier
-) {
-    if (isTV) {
-        TvVolumeStepper(
-            label = label,
-            icon = icon,
-            value = value,
-            onValueChange = onValueChange,
-            showLabel = false,
-            horizontalKeysAdjustVolume = false,
-            hintDescription = hint,
-            onFocusHint = setControlHint,
-            modifier = modifier
-        )
-    } else {
-        Icon(
-            Icons.Default.VolumeDown,
-            null,
-            tint = GlassTextMuted,
-            modifier = Modifier.size(18.dp)
-        )
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            modifier = modifier,
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = Color.White.copy(alpha = 0.85f),
-                inactiveTrackColor = Color.White.copy(alpha = 0.25f)
-            )
-        )
-    }
-}
-
-@Composable
-private fun PlaybackMusicChip(
-    title: String?,
-    artist: String?,
-    isPlaying: Boolean
-) {
-    if (title == null) return
-    GlassSurface(cornerRadius = 16.dp) {
-        Row(
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            Icon(
-                if (isPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
-                contentDescription = null,
-                tint = GlassText,
-                modifier = Modifier.size(18.dp)
-            )
-            Column {
-                Text(title, color = GlassText, fontSize = 13.sp, maxLines = 1, fontWeight = FontWeight.Medium)
-                if (artist != null) {
-                    Text(artist, color = GlassTextMuted, fontSize = 11.sp, maxLines = 1)
-                }
-            }
-        }
-    }
 }
 
 /** Fecha legible a partir de `dateAdded` (segundos epoch de MediaStore). Null si no hay dato. */
