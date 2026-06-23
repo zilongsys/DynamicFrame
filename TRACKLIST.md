@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Diagnóstico "los temas no se aplican" + indicador de tema activo
+- Estado: Completado (v0.1.58) — pendiente de confirmación del usuario tras rebuild limpio
+- Descripción: El usuario reporta que los temas no cargan nunca (ni controles ni encuadre cambian). Se auditó la cadena completa (Ajustes→DataStore→observeConfig→SlideshowEngine→ViewModel→SlideshowScreen/dispatcher) y está correcta; todos los componentes resuelven. Como no hay JDK en esta máquina (build lo hace Android Studio del usuario), se añade un indicador "Tema: …" de 2,5 s al entrar a pantalla completa que confirma si el APK incluye los cambios. Si no aparece tras Clean Project + reinstalar, el problema es de build/caché local.
+
 ## 2026-06-22 — Temas aplican al contenido, detener todo al salir, secciones colapsables con color
 - Estado: Completado (v0.1.57)
 - Descripción: (1) Los temas de reproducción ahora transforman también el contenido, no solo el overlay: Galería envuelve la foto/vídeo en un paspartú de museo (`GalleryMatFrame`), Ambiente va a sangre sin marco y Aurora Glass respeta el marco dorado opcional; así el cambio de tema se ve de inmediato (antes "se veía igual" porque solo cambiaban los controles ocultos). (2) Al salir de pantalla completa se detiene TODO (motor + vídeo + música) con el nuevo `stopSlideshow()` en el `onDispose`. (3) Ajustes: cada sección se envuelve en `SettingsSectionCard` con fondo del color de acento aplicado a todas sus opciones y cabecera pulsable para colapsar/expandir.

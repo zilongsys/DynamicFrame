@@ -125,6 +125,15 @@ fun SlideshowScreen(
         }
     }
 
+    // Confirmación breve del tema activo al entrar (también sirve de diagnóstico:
+    // si no aparece, el APK en ejecución no incluye los cambios de temas).
+    var showThemeBadge by remember { mutableStateOf(true) }
+    LaunchedEffect(config.playbackTheme) {
+        showThemeBadge = true
+        delay(2500)
+        showThemeBadge = false
+    }
+
     val screenFocus = remember { FocusRequester() }
     val pauseFocus = remember { FocusRequester() }
     val bottomBarFocus = remember { FocusRequester() }
@@ -280,6 +289,30 @@ fun SlideshowScreen(
 
         if (config.playbackShowSafeBorder) {
             PlaybackSafeBorder(modifier = Modifier.fillMaxSize())
+        }
+
+        AnimatedVisibility(
+            visible = showThemeBadge,
+            enter = fadeIn(androidx.compose.animation.core.tween(300)),
+            exit = fadeOut(androidx.compose.animation.core.tween(400)),
+            modifier = Modifier
+                .align(Alignment.TopStart)
+                .padding(16.dp)
+        ) {
+            val themeName = when (config.playbackTheme) {
+                PlaybackTheme.AMBIENT -> "Ambiente"
+                PlaybackTheme.GALLERY -> "Galería"
+                else -> "Aurora Glass"
+            }
+            GlassSurface(cornerRadius = 12.dp) {
+                Text(
+                    text = "Tema: $themeName",
+                    color = GlassText,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp)
+                )
+            }
         }
 
         AnimatedVisibility(

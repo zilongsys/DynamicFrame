@@ -1,5 +1,14 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.58
+
+### Añadido
+- **Indicador del tema activo al entrar a pantalla completa**: muestra "Tema: Aurora Glass / Ambiente / Galería" durante 2,5 s. Sirve también de diagnóstico: si no aparece, el APK en ejecución no incluye los cambios de temas (build en caché/desactualizado).
+
+### Notas (diagnóstico "los temas no se aplican")
+- Se verificó la cadena completa y es correcta: Ajustes (`updateConfig` → `UpdateSlideshowConfigUseCase` → `saveConfig`) escribe `PLAYBACK_THEME` en DataStore; `observeConfig()` emite el nuevo `SlideshowConfig`; `SlideshowEngine._config` lo recibe; `SlideshowViewModel.slideshowConfig` lo expone; `SlideshowScreen` conmuta el encuadre del contenido (`GalleryMatFrame`/a sangre/`PictureFrame`) y `PlaybackControlsOverlay` despacha al tema correcto. Todos los componentes (`MediaCircleButton`, `CenterPlayPauseButton`, `GlassSurface`, etc.) resuelven.
+- Conclusión: si tras reconstruir limpio el tema sigue sin verse, el problema es de build/caché en el equipo, no del código. Recomendado: *Build → Clean Project*, desinstalar la app del dispositivo (limpia DataStore) y volver a instalar.
+
 ## v0.1.57
 
 ### Añadido
