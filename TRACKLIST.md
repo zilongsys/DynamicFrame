@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Rediseño fiel de los 3 temas de control (identidad propia por tema)
+- Estado: Completado (v0.1.59)
+- Descripción: El usuario confirmó que el indicador de tema aparece (build nuevo) pero los controles se veían iguales entre temas porque las 3 variantes compartían estilo glass + botón central idéntico. Se rehicieron fieles a los mockups: Ambiente (glifos planos blancos, play con halo morado, sin glass), Galería (riel bronce/oro a la derecha + placa de pergamino con serif), Aurora Glass (HUD glass). Nuevos botones por tema (`AmbientFlatIcon`, `AmbientPlayButton`, `GalleryRailButton`) con foco D-pad y hints. Se regeneraron las 3 imágenes de referencia.
+
 ## 2026-06-22 — Diagnóstico "los temas no se aplican" + indicador de tema activo
 - Estado: Completado (v0.1.58) — pendiente de confirmación del usuario tras rebuild limpio
 - Descripción: El usuario reporta que los temas no cargan nunca (ni controles ni encuadre cambian). Se auditó la cadena completa (Ajustes→DataStore→observeConfig→SlideshowEngine→ViewModel→SlideshowScreen/dispatcher) y está correcta; todos los componentes resuelven. Como no hay JDK en esta máquina (build lo hace Android Studio del usuario), se añade un indicador "Tema: …" de 2,5 s al entrar a pantalla completa que confirma si el APK incluye los cambios. Si no aparece tras Clean Project + reinstalar, el problema es de build/caché local.

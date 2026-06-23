@@ -1,7 +1,12 @@
 package com.dynamicframe.presentation.slideshow
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsFocusedAsState
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.Icon
@@ -10,22 +15,33 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.MusicPlayerState
+import com.dynamicframe.domain.model.PlaybackTheme
 import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.SlideshowState
 import com.dynamicframe.presentation.device.LocalDeviceProfile
+import com.dynamicframe.ui.theme.FocusHintEffect
 import com.dynamicframe.ui.theme.GlassAlbumPillRow
 import com.dynamicframe.ui.theme.GlassCircleButton
 import com.dynamicframe.ui.theme.GlassIconButton
@@ -34,6 +50,7 @@ import com.dynamicframe.ui.theme.GlassText
 import com.dynamicframe.ui.theme.GlassTextMuted
 import com.dynamicframe.ui.theme.MemoriaPurple
 import com.dynamicframe.ui.theme.TvVolumeStepper
+import com.dynamicframe.ui.theme.safeClickable
 import com.dynamicframe.ui.theme.tvFocusRequester
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -75,9 +92,9 @@ fun PlaybackControlsOverlay(
     cb: PlaybackControlsCallbacks
 ) {
     when (config.playbackTheme) {
-        com.dynamicframe.domain.model.PlaybackTheme.AMBIENT ->
-            AmbientControls(slideshowState, config, isTV, pauseFocus, bottomBarFocus, cb)
-        com.dynamicframe.domain.model.PlaybackTheme.GALLERY ->
+        PlaybackTheme.AMBIENT ->
+            AmbientControls(slideshowState, isTV, pauseFocus, bottomBarFocus, cb)
+        PlaybackTheme.GALLERY ->
             GalleryControls(slideshowState, config, musicState, isTV, pauseFocus, cb)
         else ->
             AuroraGlassControls(
@@ -104,7 +121,6 @@ private fun AuroraGlassControls(
 ) {
     val device = LocalDeviceProfile.current
     Box(modifier = Modifier.fillMaxSize()) {
-        // Barra superior: música (izq) + acciones (der)
         Row(
             modifier = Modifier
                 .align(Alignment.TopCenter)
@@ -319,61 +335,44 @@ private fun AuroraGlassControls(
     }
 }
 
-// ── Tema A · Ambient (minimalismo cinematográfico) ────────────────────────────
+// ── Tema A · Ambient (minimalismo: glifos planos, sin glass) ───────────────────
+
+private val AmbientGlow = MemoriaPurple
 
 @Composable
 private fun AmbientControls(
     slideshowState: SlideshowState,
-    config: SlideshowConfig,
     isTV: Boolean,
     pauseFocus: FocusRequester,
     bottomBarFocus: FocusRequester,
     cb: PlaybackControlsCallbacks
 ) {
     Box(modifier = Modifier.fillMaxSize()) {
-        // Acciones discretas arriba a la derecha.
+        // Acciones planas y discretas arriba a la derecha (sin cajas/glass).
         Row(
             modifier = Modifier
                 .align(Alignment.TopEnd)
                 .padding(20.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
             cb.onBack?.let {
-                GlassCircleButton(
-                    icon = Icons.Default.ArrowBack,
-                    contentDescription = "Volver",
-                    hintDescription = "Volver al panel principal",
-                    onFocusHint = cb.setControlHint,
-                    onClick = it
-                )
+                AmbientFlatIcon(Icons.Default.ArrowBack, "Volver", "Volver al panel principal", cb.setControlHint, it)
             }
             if (slideshowState.currentItem != null) {
-                GlassCircleButton(
-                    icon = Icons.Default.DeleteOutline,
-                    contentDescription = "Borrar",
-                    hintDescription = "Borrar la foto o vídeo actual",
-                    onFocusHint = cb.setControlHint,
-                    onClick = cb.onDelete
-                )
+                AmbientFlatIcon(Icons.Default.DeleteOutline, "Borrar", "Borrar la foto o vídeo actual", cb.setControlHint, cb.onDelete)
             }
-            GlassCircleButton(
-                icon = Icons.Default.Settings,
-                contentDescription = "Ajustes",
-                hintDescription = "Abrir ajustes de la app",
-                onFocusHint = cb.setControlHint,
-                onClick = cb.onOpenSettings
-            )
+            AmbientFlatIcon(Icons.Default.Settings, "Ajustes", "Abrir ajustes de la app", cb.setControlHint, cb.onOpenSettings)
         }
 
-        // Barra inferior mínima sobre un scrim degradado para legibilidad.
+        // Scrim degradado inferior para legibilidad (sin paneles).
         Box(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .height(220.dp)
+                .height(240.dp)
                 .background(
                     Brush.verticalGradient(
-                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.65f))
+                        colors = listOf(Color.Transparent, Color.Black.copy(alpha = 0.55f))
                     )
                 )
         )
@@ -382,7 +381,7 @@ private fun AmbientControls(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(bottom = 40.dp),
+                .padding(bottom = 44.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             if (slideshowState.totalItems > 0) {
@@ -391,48 +390,140 @@ private fun AmbientControls(
                 LinearProgressIndicator(
                     progress = slideProgress,
                     modifier = Modifier
-                        .fillMaxWidth(0.5f)
-                        .padding(bottom = 20.dp),
-                    color = MemoriaPurple,
+                        .fillMaxWidth(0.32f)
+                        .padding(bottom = 22.dp),
+                    color = Color.White,
                     trackColor = Color.White.copy(alpha = 0.25f)
                 )
             }
             Row(
-                horizontalArrangement = Arrangement.spacedBy(28.dp),
+                horizontalArrangement = Arrangement.spacedBy(40.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                MediaCircleButton(
-                    icon = Icons.Default.SkipPrevious,
-                    contentDescription = "Anterior",
-                    onClick = cb.onPrevious,
-                    size = 64.dp,
-                    hintDescription = "Foto o vídeo anterior",
-                    onFocusHint = cb.setControlHint,
+                AmbientFlatIcon(
+                    Icons.Default.SkipPrevious, "Anterior", "Foto o vídeo anterior", cb.setControlHint, cb.onPrevious,
+                    size = 56.dp, iconSize = 34.dp,
                     modifier = if (isTV) Modifier.focusRequester(bottomBarFocus) else Modifier
                 )
-                CenterPlayPauseButton(
+                AmbientPlayButton(
                     isPlaying = slideshowState.isPlaying,
-                    onClick = cb.onPlayPause,
-                    buttonSize = 100.dp,
-                    modifier = pauseDpadModifier(isTV, pauseFocus, bottomBarFocus),
+                    isTV = isTV,
+                    pauseFocus = pauseFocus,
+                    bottomBarFocus = bottomBarFocus,
                     onFocusChanged = cb.onPauseFocusChanged,
-                    hintDescription = if (slideshowState.isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
-                    onFocusHint = cb.setControlHint
+                    onFocusHint = cb.setControlHint,
+                    onClick = cb.onPlayPause
                 )
-                MediaCircleButton(
-                    icon = Icons.Default.SkipNext,
-                    contentDescription = "Siguiente",
-                    onClick = cb.onNext,
-                    size = 64.dp,
-                    hintDescription = "Foto o vídeo siguiente",
-                    onFocusHint = cb.setControlHint
+                AmbientFlatIcon(
+                    Icons.Default.SkipNext, "Siguiente", "Foto o vídeo siguiente", cb.setControlHint, cb.onNext,
+                    size = 56.dp, iconSize = 34.dp
                 )
             }
         }
     }
 }
 
-// ── Tema B · Gallery (marco editorial / museo) ────────────────────────────────
+@Composable
+private fun AmbientFlatIcon(
+    icon: ImageVector,
+    contentDescription: String,
+    hint: String,
+    onFocusHint: (String) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 44.dp,
+    iconSize: Dp = 24.dp
+) {
+    val device = LocalDeviceProfile.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    FocusHintEffect(focused = focused, description = hint, onHint = onFocusHint)
+    Box(
+        modifier = modifier
+            .size(size)
+            .scale(if (focused && device.isTv) 1.2f else 1f)
+            .clip(CircleShape)
+            .then(if (focused) Modifier.background(Color.White.copy(alpha = 0.16f)) else Modifier)
+            .safeClickable(
+                onClick = onClick,
+                showFocusBorder = false,
+                focusShape = CircleShape,
+                interactionSource = interaction
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            icon, contentDescription,
+            tint = if (focused) Color.White else Color.White.copy(alpha = 0.7f),
+            modifier = Modifier.size(iconSize)
+        )
+    }
+}
+
+@Composable
+private fun AmbientPlayButton(
+    isPlaying: Boolean,
+    isTV: Boolean,
+    pauseFocus: FocusRequester,
+    bottomBarFocus: FocusRequester,
+    onFocusChanged: (Boolean) -> Unit,
+    onFocusHint: (String) -> Unit,
+    onClick: () -> Unit
+) {
+    val device = LocalDeviceProfile.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    FocusHintEffect(
+        focused = focused,
+        description = if (isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
+        onHint = onFocusHint
+    )
+    Box(
+        modifier = pauseDpadModifier(isTV, pauseFocus, bottomBarFocus)
+            .size(108.dp)
+            .scale(if (focused && device.isTv) 1.06f else 1f)
+            .onFocusChanged { onFocusChanged(it.isFocused) }
+            .clip(CircleShape)
+            .background(
+                Brush.radialGradient(
+                    colors = listOf(
+                        AmbientGlow.copy(alpha = if (focused) 0.95f else 0.5f),
+                        Color.Transparent
+                    )
+                )
+            )
+            .safeClickable(
+                onClick = onClick,
+                showFocusBorder = false,
+                focusShape = CircleShape,
+                interactionSource = interaction
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Box(
+            modifier = Modifier
+                .size(76.dp)
+                .clip(CircleShape)
+                .border(2.dp, Color.White.copy(alpha = 0.92f), CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                if (isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (isPlaying) "Pausar" else "Reproducir",
+                tint = Color.White,
+                modifier = Modifier.size(42.dp)
+            )
+        }
+    }
+}
+
+// ── Tema B · Gallery (museo: riel bronce/oro + placa de pergamino) ─────────────
+
+private val GalleryBronze = Color(0xCC5C461F)
+private val GalleryGoldBorder = Color(0xFFD9B25A)
+private val GalleryGoldBright = Color(0xFFE8C877)
+private val GalleryInk = Color(0xFF2A2010)
+private val GalleryParchment = Color(0xFFEFE6CF)
 
 @Composable
 private fun GalleryControls(
@@ -445,103 +536,143 @@ private fun GalleryControls(
 ) {
     val item = slideshowState.currentItem
     Box(modifier = Modifier.fillMaxSize()) {
-        // Placa de datos tipo museo, centrada abajo.
+        // Placa de datos tipo museo (pergamino), centrada abajo.
         if (item != null && config.playbackShowOverlay) {
-            GlassSurface(
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(bottom = 28.dp)
-                    .widthIn(min = 260.dp),
-                cornerRadius = 14.dp
+                    .padding(bottom = 30.dp)
+                    .widthIn(min = 240.dp)
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(GalleryParchment)
+                    .border(1.dp, GalleryGoldBorder, RoundedCornerShape(8.dp))
+                    .padding(horizontal = 30.dp, vertical = 14.dp),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    formatItemDate(item.dateAdded)?.let { date ->
-                        Text(
-                            text = date,
-                            color = GlassText,
-                            fontSize = 20.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    }
-                    val subtitle = item.albumName.ifBlank { item.name }.ifBlank { "Recuerdos" }
+                formatItemDate(item.dateAdded)?.let { date ->
                     Text(
-                        text = subtitle,
-                        color = GlassTextMuted,
-                        fontSize = 13.sp,
-                        maxLines = 1
+                        text = date,
+                        color = GalleryInk,
+                        fontFamily = FontFamily.Serif,
+                        fontSize = 22.sp,
+                        fontWeight = FontWeight.SemiBold
                     )
-                    if (slideshowState.totalItems > 0) {
-                        Text(
-                            text = "${slideshowState.currentIndex + 1} / ${slideshowState.totalItems}",
-                            color = GlassTextMuted.copy(alpha = 0.7f),
-                            fontSize = 11.sp,
-                            modifier = Modifier.padding(top = 2.dp)
-                        )
-                    }
+                }
+                val subtitle = item.albumName.ifBlank { item.name }.ifBlank { "Recuerdos" }
+                Text(
+                    text = subtitle,
+                    color = GalleryInk.copy(alpha = 0.7f),
+                    fontFamily = FontFamily.Serif,
+                    fontStyle = FontStyle.Italic,
+                    fontSize = 13.sp,
+                    maxLines = 1
+                )
+                if (slideshowState.totalItems > 0) {
+                    Text(
+                        text = "${slideshowState.currentIndex + 1} / ${slideshowState.totalItems}",
+                        color = GalleryInk.copy(alpha = 0.6f),
+                        fontSize = 11.sp,
+                        modifier = Modifier.padding(top = 2.dp)
+                    )
                 }
             }
         }
 
-        // Riel vertical de controles acoplado a la derecha.
+        // Riel vertical de controles bronce/oro acoplado a la derecha.
         Column(
             modifier = Modifier
                 .align(Alignment.CenterEnd)
-                .padding(end = 24.dp),
+                .padding(end = 22.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            CenterPlayPauseButton(
-                isPlaying = slideshowState.isPlaying,
+            GalleryRailButton(
+                icon = if (slideshowState.isPlaying) Icons.Default.Pause else Icons.Default.PlayArrow,
+                contentDescription = if (slideshowState.isPlaying) "Pausar" else "Reproducir",
+                hint = if (slideshowState.isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
+                onFocusHint = cb.setControlHint,
                 onClick = cb.onPlayPause,
-                buttonSize = 72.dp,
-                modifier = if (isTV) Modifier.tvFocusRequester(pauseFocus) else Modifier,
+                size = 72.dp,
                 onFocusChanged = cb.onPauseFocusChanged,
-                hintDescription = if (slideshowState.isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
-                onFocusHint = cb.setControlHint
+                modifier = if (isTV) Modifier.tvFocusRequester(pauseFocus) else Modifier
             )
-            MediaCircleButton(
+            GalleryRailButton(
                 icon = Icons.Default.SkipPrevious,
                 contentDescription = "Anterior",
-                onClick = cb.onPrevious,
-                size = 56.dp,
-                hintDescription = "Foto o vídeo anterior",
-                onFocusHint = cb.setControlHint
+                hint = "Foto o vídeo anterior",
+                onFocusHint = cb.setControlHint,
+                onClick = cb.onPrevious
             )
-            MediaCircleButton(
+            GalleryRailButton(
                 icon = Icons.Default.SkipNext,
                 contentDescription = "Siguiente",
-                onClick = cb.onNext,
-                size = 56.dp,
-                hintDescription = "Foto o vídeo siguiente",
-                onFocusHint = cb.setControlHint
+                hint = "Foto o vídeo siguiente",
+                onFocusHint = cb.setControlHint,
+                onClick = cb.onNext
             )
-            MediaCircleButton(
+            GalleryRailButton(
                 icon = if (musicState.isPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
                 contentDescription = "Música",
-                onClick = cb.onToggleMusic,
-                size = 56.dp,
-                hintDescription = if (musicState.isPlaying) "Pausar música" else "Reanudar música",
-                onFocusHint = cb.setControlHint
+                hint = if (musicState.isPlaying) "Pausar música" else "Reanudar música",
+                onFocusHint = cb.setControlHint,
+                onClick = cb.onToggleMusic
             )
-            MediaCircleButton(
+            GalleryRailButton(
                 icon = Icons.Default.Settings,
                 contentDescription = "Ajustes",
-                onClick = cb.onOpenSettings,
-                size = 56.dp,
-                hintDescription = "Abrir ajustes de la app",
-                onFocusHint = cb.setControlHint
+                hint = "Abrir ajustes de la app",
+                onFocusHint = cb.setControlHint,
+                onClick = cb.onOpenSettings
             )
             cb.onBack?.let {
-                MediaCircleButton(
+                GalleryRailButton(
                     icon = Icons.Default.ArrowBack,
                     contentDescription = "Volver",
-                    onClick = it,
-                    size = 56.dp,
-                    hintDescription = "Volver al panel principal",
-                    onFocusHint = cb.setControlHint
+                    hint = "Volver al panel principal",
+                    onFocusHint = cb.setControlHint,
+                    onClick = it
                 )
             }
         }
+    }
+}
+
+@Composable
+private fun GalleryRailButton(
+    icon: ImageVector,
+    contentDescription: String,
+    hint: String,
+    onFocusHint: (String) -> Unit,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    size: Dp = 56.dp,
+    onFocusChanged: (Boolean) -> Unit = {}
+) {
+    val device = LocalDeviceProfile.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    FocusHintEffect(focused = focused, description = hint, onHint = onFocusHint)
+    Box(
+        modifier = modifier
+            .size(size)
+            .scale(if (focused && device.isTv) 1.1f else 1f)
+            .onFocusChanged { onFocusChanged(it.isFocused) }
+            .clip(CircleShape)
+            .background(if (focused) GalleryGoldBright else GalleryBronze)
+            .border(1.5.dp, GalleryGoldBorder, CircleShape)
+            .safeClickable(
+                onClick = onClick,
+                showFocusBorder = false,
+                focusShape = CircleShape,
+                interactionSource = interaction
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            icon, contentDescription,
+            tint = if (focused) GalleryInk else GalleryGoldBright,
+            modifier = Modifier.size((size.value * 0.42f).dp)
+        )
     }
 }
 
@@ -564,7 +695,7 @@ private fun pauseDpadModifier(
 @Composable
 private fun VolumeControl(
     isTV: Boolean,
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    icon: ImageVector,
     label: String,
     value: Float,
     onValueChange: (Float) -> Unit,

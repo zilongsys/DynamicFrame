@@ -1,5 +1,14 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.59
+
+### Actualizado
+- **Rediseño fiel de los 3 temas de control** para que cada uno tenga identidad visual propia (antes los tres compartían el estilo "glass" y un botón central idéntico, por lo que parecían iguales):
+  - **Ambiente**: minimalismo real — glifos planos blancos sin cajas/glass, botón central de play/pausa con **halo morado radial**, acciones superiores discretas a baja opacidad y barra de progreso fina y corta sobre un scrim degradado.
+  - **Galería**: estilo museo — **riel vertical de botones circulares bronce con borde dorado** acoplado a la derecha, y **placa de pergamino** (no glass) centrada abajo con fecha en tipografía serif, álbum en cursiva y posición.
+  - **Aurora Glass**: HUD glassmorphism inferior (sin cambios).
+- Nuevos botones específicos por tema (`AmbientFlatIcon`, `AmbientPlayButton`, `GalleryRailButton`) con foco D-pad, escala al enfocar y hints, en lugar de reutilizar el botón glass común.
+
 ## v0.1.58
 
 ### Añadido
