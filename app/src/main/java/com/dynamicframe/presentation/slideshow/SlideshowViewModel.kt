@@ -140,6 +140,16 @@ class SlideshowViewModel @Inject constructor(
         musicCoordinator.pause()
     }
 
+    /**
+     * Detiene TODO lo que se está reproduciendo: slideshow, vídeo en curso y música.
+     * Se llama al salir del modo pantalla completa para que nada siga sonando/reproduciéndose.
+     */
+    fun stopSlideshow() {
+        slideshowEngine.pause()
+        runCatching { slideshowVideoPlayer.stop() }
+        musicCoordinator.pause()
+    }
+
     fun nextSlide() = slideshowEngine.next()
     fun previousSlide() = slideshowEngine.previous()
     fun onVideoCompleted() = slideshowEngine.onVideoCompleted()

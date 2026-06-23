@@ -16,6 +16,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.dynamicframe.domain.model.PlaybackTheme
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
 import com.dynamicframe.ui.theme.*
@@ -49,7 +50,8 @@ fun SlideshowScreen(
     DisposableEffect(Unit) {
         viewModel.startSlideshow(freshSession = true)
         onDispose {
-            viewModel.pauseSlideshow()
+            // Al salir de pantalla completa se detiene TODO (slideshow, vídeo y música).
+            viewModel.stopSlideshow()
         }
     }
 
@@ -207,35 +209,47 @@ fun SlideshowScreen(
                 .focusable(enabled = false)
         ) {
         if (currentItem != null) {
+            // El contenido de medios; el encuadre depende del tema seleccionado.
+            val mediaViewport: @Composable () -> Unit = {
+                SlideshowMediaViewport(
+                    currentItem = currentItem,
+                    nextItem = slideshowState.nextItem,
+                    playlistItems = slideshowState.playlistItems,
+                    currentIndex = slideshowState.currentIndex,
+                    transitionType = config.transition,
+                    transitionDurationMs = config.transitionDurationMs,
+                    isPlaying = slideshowState.isPlaying,
+                    muteVideoAudio = config.muteVideoAudio,
+                    mediaVolume = config.mediaVolume,
+                    videoPlayer = viewModel.slideshowVideoPlayer,
+                    playToken = slideshowState.playToken,
+                    onVideoEnded = { viewModel.onVideoCompleted() },
+                    onPlaybackError = { viewModel.onPlaybackError() },
+                    onPreloadImages = viewModel::preloadImages,
+                    backgroundType = config.playbackBackgroundType,
+                    backgroundImageUri = config.playbackBackgroundImageUri,
+                    modifier = Modifier.fillMaxSize()
+                )
+            }
             Box(
                 modifier = Modifier.fillMaxSize(),
                 contentAlignment = Alignment.Center
             ) {
                 Box(modifier = Modifier.fillMaxSize(contentZoom)) {
-                    PictureFrame(
-                        enabled = config.showPictureFrame,
-                        scaleFactor = config.playbackPictureFrameScale,
-                        modifier = Modifier.fillMaxSize()
-                    ) {
-                        SlideshowMediaViewport(
-                            currentItem = currentItem,
-                            nextItem = slideshowState.nextItem,
-                            playlistItems = slideshowState.playlistItems,
-                            currentIndex = slideshowState.currentIndex,
-                            transitionType = config.transition,
-                            transitionDurationMs = config.transitionDurationMs,
-                            isPlaying = slideshowState.isPlaying,
-                            muteVideoAudio = config.muteVideoAudio,
-                            mediaVolume = config.mediaVolume,
-                            videoPlayer = viewModel.slideshowVideoPlayer,
-                            playToken = slideshowState.playToken,
-                            onVideoEnded = { viewModel.onVideoCompleted() },
-                            onPlaybackError = { viewModel.onPlaybackError() },
-                            onPreloadImages = viewModel::preloadImages,
-                            backgroundType = config.playbackBackgroundType,
-                            backgroundImageUri = config.playbackBackgroundImageUri,
+                    when (config.playbackTheme) {
+                        // Galería: paspartú editorial siempre visible (tema "museo").
+                        PlaybackTheme.GALLERY -> GalleryMatFrame(
+                            scaleFactor = config.playbackPictureFrameScale,
                             modifier = Modifier.fillMaxSize()
-                        )
+                        ) { mediaViewport() }
+                        // Ambiente: a sangre, sin marco (minimalismo cinematográfico).
+                        PlaybackTheme.AMBIENT -> Box(Modifier.fillMaxSize()) { mediaViewport() }
+                        // Aurora Glass: respeta el marco dorado opcional del usuario.
+                        else -> PictureFrame(
+                            enabled = config.showPictureFrame,
+                            scaleFactor = config.playbackPictureFrameScale,
+                            modifier = Modifier.fillMaxSize()
+                        ) { mediaViewport() }
                     }
                 }
             }

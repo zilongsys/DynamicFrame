@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Temas aplican al contenido, detener todo al salir, secciones colapsables con color
+- Estado: Completado (v0.1.57)
+- Descripción: (1) Los temas de reproducción ahora transforman también el contenido, no solo el overlay: Galería envuelve la foto/vídeo en un paspartú de museo (`GalleryMatFrame`), Ambiente va a sangre sin marco y Aurora Glass respeta el marco dorado opcional; así el cambio de tema se ve de inmediato (antes "se veía igual" porque solo cambiaban los controles ocultos). (2) Al salir de pantalla completa se detiene TODO (motor + vídeo + música) con el nuevo `stopSlideshow()` en el `onDispose`. (3) Ajustes: cada sección se envuelve en `SettingsSectionCard` con fondo del color de acento aplicado a todas sus opciones y cabecera pulsable para colapsar/expandir.
+
 ## 2026-06-22 — Pantalla de reproducción: 3 temas de interfaz seleccionables (Aurora Glass por defecto)
 - Estado: Completado (v0.1.56)
 - Descripción: Tras analizar la pantalla de reproducción y proponer 3 estilos con mockups, se implementan los 3 como temas elegibles (enum `PlaybackTheme`, persistido en DataStore): Aurora Glass (HUD glass, por defecto), Ambiente (minimalista con scrim) y Galería (riel lateral + placa de datos). Selector en Ajustes → Visual. Nuevo `PlaybackControlThemes.kt` con dispatcher `PlaybackControlsOverlay` y modelo `PlaybackControlsCallbacks`. Además se arreglan bugs comunes: auto-ocultado de controles (TV no ocultaba si el foco no estaba en play/pausa; móvil ocultaba a mitad de gesto), estado vacío engañoso y reentrancia del formateador del reloj.

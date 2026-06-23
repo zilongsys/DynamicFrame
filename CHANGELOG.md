@@ -1,5 +1,18 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.57
+
+### Añadido
+- **Los temas de reproducción ahora transforman también el contenido** (no solo el overlay de controles):
+  - **Galería**: muestra siempre un paspartú editorial tipo museo (`GalleryMatFrame`, grafito + crema) alrededor de la foto/vídeo, independientemente del marco dorado.
+  - **Ambiente**: contenido a sangre, sin ningún marco (minimalismo cinematográfico).
+  - **Aurora Glass**: respeta el marco dorado opcional del usuario (`showPictureFrame`).
+  - Así, al cambiar de tema en Ajustes el aspecto de la pantalla cambia de inmediato, no solo al abrir los controles.
+- **Ajustes — secciones colapsables con fondo de color completo**: cada sección (Fotos, Videos, Música, Slideshow, Visual, Reloj, TV, Sistema) se envuelve ahora en una tarjeta `SettingsSectionCard` con el fondo del color de acento de la sección aplicado a **todas** sus opciones, y cabecera pulsable para expandir/contraer.
+
+### Corregido
+- **Al salir de pantalla completa se detiene TODO lo que se reproduce**: nuevo `SlideshowViewModel.stopSlideshow()` que pausa el motor, detiene el vídeo en curso (`stop()`) y para la música. Se invoca en el `onDispose` de `SlideshowScreen` en lugar de solo pausar.
+
 ## v0.1.56
 
 ### Añadido

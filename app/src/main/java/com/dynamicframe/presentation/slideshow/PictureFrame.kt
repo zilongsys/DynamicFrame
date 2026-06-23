@@ -79,3 +79,51 @@ fun PictureFrame(
         )
     }
 }
+
+// Tonos del marco editorial (tema Galería): grafito + paspartú crema, sin dorado.
+private val GalleryWall = Color(0xFF14110E)
+private val GalleryFrameDark = Color(0xFF2B2622)
+private val GalleryFrameLine = Color(0xFF0F0D0B)
+private val GalleryMatCream = Color(0xFFF3ECDD)
+private val GalleryMatBevel = Color(0xFFE4D9C2)
+
+/**
+ * Marco editorial tipo museo para el tema [com.dynamicframe.domain.model.PlaybackTheme.GALLERY]:
+ * paspartú crema con borde grafito fino (sin el dorado recargado del [PictureFrame]).
+ */
+@Composable
+fun GalleryMatFrame(
+    modifier: Modifier = Modifier,
+    scaleFactor: Float = 1f,
+    content: @Composable BoxScope.() -> Unit
+) {
+    val device = LocalDeviceProfile.current
+    val scale = (if (device.isTv) 1.2f else 1f) * scaleFactor.coerceIn(0.4f, 2f)
+    val frame = (14f * scale).dp
+    val line = (3f * scale).dp
+    val mat = (24f * scale).dp
+    val bevel = (2f * scale).dp
+
+    Box(
+        modifier = modifier
+            .fillMaxSize()
+            .background(GalleryWall)
+            .padding(frame)
+            .background(GalleryFrameDark)
+            .padding(line)
+            .background(GalleryFrameLine)
+            .padding(mat)
+            .background(GalleryMatCream)
+            .padding(bevel)
+            .background(GalleryMatBevel)
+            .padding(bevel)
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RectangleShape)
+                .background(Color.Black),
+            content = content
+        )
+    }
+}
