@@ -18,6 +18,7 @@ import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.TransitionType
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
+import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
 import com.dynamicframe.ui.components.AppAsyncImage
 import com.dynamicframe.ui.theme.PlaybackLetterboxBackground
 import kotlin.math.roundToInt
@@ -36,17 +37,22 @@ fun SlideshowMediaViewport(
     mediaVolume: Float,
     videoPlayer: SlideshowVideoPlayerRepository,
     playToken: Int = 0,
+    videoBackdropPlayer: VideoBackdropPlayerRepository? = null,
     onVideoEnded: () -> Unit,
     onPlaybackError: () -> Unit = onVideoEnded,
     onPreloadImages: (List<String>, Int, Int) -> Unit = { _, _, _ -> },
     backgroundType: com.dynamicframe.domain.model.PlaybackBackgroundType = com.dynamicframe.domain.model.PlaybackBackgroundType.BLACK,
     backgroundImageUri: String = "",
+    /** Paradise: el fondo lo aporta la capa blur; no pintar letterbox aquí. */
+    skipLetterboxBackground: Boolean = false,
+    /** Paradise: crossfade en [ParadiseSlideshowMediaStack]; sin AnimatedContent interno. */
+    externalCrossfade: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val decodeSize = rememberMaxDecodeSize()
     val isVideo = currentItem.type == MediaType.VIDEO
 
-    val effectiveTransition = if (isVideo || nextItem?.type == MediaType.VIDEO) {
+    val effectiveTransition = if (externalCrossfade || isVideo || nextItem?.type == MediaType.VIDEO) {
         TransitionType.NONE
     } else {
         transitionType
@@ -68,14 +74,16 @@ fun SlideshowMediaViewport(
             .fillMaxSize()
             .focusable(enabled = false)
     ) {
-        PlaybackLetterboxBackground(
-            type = backgroundType,
-            customImageUri = backgroundImageUri,
-            modifier = Modifier.fillMaxSize()
-        )
+        if (!skipLetterboxBackground) {
+            PlaybackLetterboxBackground(
+                type = backgroundType,
+                customImageUri = backgroundImageUri,
+                modifier = Modifier.fillMaxSize()
+            )
+        }
 
         // Underlay (foto previa) solo bajo imágenes para fundidos suaves.
-        if (!isVideo) {
+        if (!externalCrossfade && !isVideo) {
             underlayUri?.let { uri ->
                 SlideshowImageContent(
                     uri = uri,
@@ -85,6 +93,16 @@ fun SlideshowMediaViewport(
             }
         }
 
+        if (externalCrossfade && !isVideo) {
+            SlideshowImageContent(
+                uri = currentItem.uri,
+                transitionType = TransitionType.NONE,
+                decodeWidth = decodeSize.first,
+                decodeHeight = decodeSize.second,
+                modifier = Modifier.fillMaxSize(),
+                onLoadError = onPlaybackError,
+            )
+        } else if (!isVideo) {
         // Imágenes con transición animada. targetState es siempre MediaItem para que
         // slideshowTransitionSpec (tipado sobre MediaItem) compile sin cambios.
         // Cuando el ítem es vídeo, el lambda no renderiza nada (el vídeo se dibuja
@@ -110,12 +128,19 @@ fun SlideshowMediaViewport(
                 )
             }
         }
+        }
 
         // Reproductor de vídeo FUERA de AnimatedContent: así no se recrea al cambiar
         // de un vídeo a otro (solo cambian uri y playToken). Gracias a
         // keepContentOnPlayerReset el último frame permanece visible mientras el
         // nuevo vídeo carga, eliminando el flash negro entre vídeos.
-        if (isVideo) {
+        //
+        // En modo externalCrossfade (Paradise), el AnimatedContent externo compone
+        // dos instancias simultáneamente durante la transición. Ambas usarían el mismo
+        // player singleton causando una carrera. El guard isPlaying limita el player
+        // a la instancia activa (isPlaying=true); la instancia saliente no lo monta
+        // y por tanto su DisposableEffect no llama stopIfCurrent al desmontarse.
+        if (isVideo && (!externalCrossfade || isPlaying)) {
             SlideshowVideoPlayer(
                 videoPlayer = videoPlayer,
                 uri = currentItem.uri,
@@ -125,6 +150,7 @@ fun SlideshowMediaViewport(
                 onVideoEnded = onVideoEnded,
                 onPlaybackError = onPlaybackError,
                 playToken = playToken,
+                backdropPlayer = videoBackdropPlayer,
                 modifier = Modifier.fillMaxSize()
             )
         }

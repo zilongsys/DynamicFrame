@@ -2,6 +2,7 @@ package com.dynamicframe.presentation.slideshow
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.focusable
@@ -19,7 +20,13 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onKeyEvent
+import androidx.compose.ui.input.key.type
 import com.dynamicframe.domain.model.PlaybackTheme
+import com.dynamicframe.domain.model.isParadiseActive
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
 import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
 import com.dynamicframe.ui.theme.*
@@ -41,6 +48,9 @@ fun SlideshowScreen(
     val config by viewModel.slideshowConfig.collectAsStateWithLifecycle()
     val musicState by viewModel.musicState.collectAsStateWithLifecycle()
     val albumPills by viewModel.albumPills.collectAsStateWithLifecycle()
+    val videoBlurThumbnailUri by viewModel.videoBlurThumbnailUri.collectAsStateWithLifecycle()
+    val weatherInfo by viewModel.weatherInfo.collectAsStateWithLifecycle()
+    val paradiseControlsVisible by viewModel.controlsVisible.collectAsStateWithLifecycle()
     val selectedAlbumId by viewModel.selectedAlbumId.collectAsStateWithLifecycle()
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
@@ -84,33 +94,69 @@ fun SlideshowScreen(
     )
 
     var showControls by remember { mutableStateOf(false) }
+    val isParadise = config.isParadiseActive()
+    val controlsShown = if (isParadise) paradiseControlsVisible else showControls
     // Cada interacción (navegación de foco, click, ajuste de volumen) incrementa
     // este contador para reiniciar el temporizador de auto-ocultado.
     var interactionTick by remember { mutableIntStateOf(0) }
     val (showActionHint, pulseActionHint) = rememberTransientVisibility(1_000L)
+    var showParadiseDpadHint by remember { mutableStateOf(false) }
+    var paradiseDpadHintTimerTick by remember { mutableIntStateOf(0) }
 
-    fun touch() { interactionTick++ }
+    fun pulseParadiseDpadHint() {
+        if (!isTV) return
+        showParadiseDpadHint = true
+        paradiseDpadHintTimerTick++
+    }
+
+    fun touch() {
+        interactionTick++
+        if (isParadise) viewModel.onControlsInteraction()
+    }
 
     fun revealControls() {
+        if (isParadise) {
+            viewModel.onRemoteOkPressed()
+            return
+        }
         showControls = true
         touch()
         pulseActionHint()
     }
 
-    // Auto-ocultado robusto: en TV oculta tras 6 s de inactividad sin importar qué
-    // control tiene el foco (antes solo ocultaba si el foco estaba en play/pausa).
-    // En móvil, cualquier interacción reinicia el temporizador (antes desaparecía a
-    // mitad de un gesto). Se reinicia siempre que cambie [interactionTick].
-    LaunchedEffect(showControls, interactionTick, isTV) {
-        if (!showControls) {
-            pulseActionHint()
+    // Auto-ocultado (temas no-Paradise): TV 6 s / móvil 5 s.
+    LaunchedEffect(showControls, interactionTick, isTV, isParadise) {
+        if (isParadise || !showControls) {
+            if (!isParadise && !showControls) pulseActionHint()
             return@LaunchedEffect
         }
         delay(if (isTV) 6_000 else 5_000)
         showControls = false
     }
 
-    val showClock = config.playbackShowClock && showControls
+    val isParadiseEarly = isParadise
+    LaunchedEffect(isParadiseEarly, isTV) {
+        if (isParadiseEarly && isTV) {
+            showParadiseDpadHint = true
+            paradiseDpadHintTimerTick++
+        } else {
+            showParadiseDpadHint = false
+        }
+    }
+
+    LaunchedEffect(paradiseDpadHintTimerTick) {
+        if (!showParadiseDpadHint) return@LaunchedEffect
+        delay(10_000L)
+        showParadiseDpadHint = false
+    }
+
+    LaunchedEffect(controlsShown, isParadiseEarly, isTV) {
+        if (isParadiseEarly && isTV && !controlsShown) {
+            pulseParadiseDpadHint()
+        }
+    }
+
+    val showClock = config.playbackShowClock && (isParadise || controlsShown)
     val contentZoom = config.playbackContentZoom.coerceIn(0.75f, 1f)
 
     var currentTime by remember { mutableStateOf("") }
@@ -131,7 +177,7 @@ fun SlideshowScreen(
     // Confirmación breve del tema activo al entrar (también sirve de diagnóstico:
     // si no aparece, el APK en ejecución no incluye los cambios de temas).
     var showThemeBadge by remember { mutableStateOf(true) }
-    LaunchedEffect(config.playbackTheme) {
+    LaunchedEffect(config.appTheme, config.playbackTheme) {
         showThemeBadge = true
         delay(2500)
         showThemeBadge = false
@@ -140,8 +186,12 @@ fun SlideshowScreen(
     val screenFocus = remember { FocusRequester() }
     val pauseFocus = remember { FocusRequester() }
     val bottomBarFocus = remember { FocusRequester() }
-    val themeAlwaysVisible = config.playbackTheme != PlaybackTheme.AURORA_GLASS
-    val backgroundCapturesFocus = isTV && !showControls && !themeAlwaysVisible
+    // Paradise tiene su propio pill de controles, separado del overlay de Aurora/Ambiente/Galería.
+    // Necesita un FocusRequester independiente para que el D-pad entre en los IconButtons
+    // cuando los controles aparecen tras pulsar OK.
+    val paradiseFocus = remember { FocusRequester() }
+    val themeAlwaysVisible = !isParadise && config.playbackTheme != PlaybackTheme.AURORA_GLASS
+    val backgroundCapturesFocus = isTV && !controlsShown && !themeAlwaysVisible
     var backNavigationEnabled by remember { mutableStateOf(!isTV) }
 
     LaunchedEffect(Unit) {
@@ -151,16 +201,22 @@ fun SlideshowScreen(
         }
     }
 
-    LaunchedEffect(showControls, isTV, themeAlwaysVisible) {
+    LaunchedEffect(controlsShown, isTV, themeAlwaysVisible, isParadise) {
         if (!isTV) return@LaunchedEffect
         delay(150)
-        if (showControls || themeAlwaysVisible) pauseFocus.requestFocusWhenReady()
-        else screenFocus.requestFocusWhenReady()
+        when {
+            // Paradise usa su propio pill: el foco va a paradiseFocus (primer botón del pill).
+            isParadise && controlsShown -> paradiseFocus.requestFocusWhenReady()
+            // Temas clásicos (Aurora, Ambiente, Galería): foco al botón de pausa central.
+            controlsShown || themeAlwaysVisible -> pauseFocus.requestFocusWhenReady()
+            // Sin controles visibles: foco al fondo (captura teclas del mando).
+            else -> screenFocus.requestFocusWhenReady()
+        }
     }
 
     BackHandler(enabled = isTV && onBack != null && backNavigationEnabled) {
-        if (showControls) {
-            showControls = false
+        if (controlsShown) {
+            if (isParadise) viewModel.hideControls() else showControls = false
         } else {
             onBack?.invoke()
         }
@@ -203,7 +259,33 @@ fun SlideshowScreen(
             .padding(padding)
             .background(Color.Black)
             .then(
+                if (isParadise) {
+                    Modifier.onKeyEvent { event ->
+                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                        when (event.key) {
+                            Key.DirectionCenter,
+                            Key.Enter,
+                            Key.NumPadEnter,
+                            Key.ButtonA -> {
+                                viewModel.onRemoteOkPressed()
+                                true
+                            }
+                            else -> false
+                        }
+                    }
+                } else {
+                    Modifier
+                }
+            )
+            .then(
                 when {
+                    backgroundCapturesFocus && isParadise -> Modifier
+                        .tvFocusRequester(screenFocus)
+                        .paradiseScreensaverKeys(
+                            onOk = { viewModel.onRemoteOkPressed() },
+                            onOtherRemoteKey = { pulseParadiseDpadHint() },
+                        )
+                        .safeClickable(showFocusBorder = false, onClick = { viewModel.onRemoteOkPressed() })
                     backgroundCapturesFocus -> Modifier
                         .tvFocusRequester(screenFocus)
                         .tvRevealOnDpad(enabled = true, onReveal = { revealControls() })
@@ -216,6 +298,60 @@ fun SlideshowScreen(
     ) {
         val currentItem = slideshowState.currentItem
 
+        if (isParadise) {
+            if (currentItem != null) {
+                ParadiseSlideshowMediaStack(
+                    currentItem = currentItem,
+                    slideshowState = slideshowState,
+                    config = config,
+                    contentZoom = contentZoom,
+                    videoPlayer = viewModel.slideshowVideoPlayer,
+                    videoBackdropPlayer = viewModel.videoBackdropPlayer,
+                    videoBlurThumbnailUri = videoBlurThumbnailUri,
+                    onVideoEnded = { viewModel.onVideoCompleted() },
+                    onPlaybackError = { viewModel.onPlaybackError() },
+                    onPreloadImages = viewModel::preloadImages
+                )
+            } else {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color.Black),
+                    contentAlignment = Alignment.Center
+                ) {
+                    if (showPermissionDenied) {
+                        MediaPermissionDeniedBanner(
+                            message = "Concede acceso a fotos y vídeos en Ajustes del sistema para reproducir el slideshow.",
+                            modifier = Modifier.padding(horizontal = 24.dp)
+                        )
+                    } else {
+                        Text(
+                            text = slideshowState.error
+                                ?: if (slideshowState.totalItems == 0) "No hay fotos ni vídeos. Añade carpetas en Ajustes."
+                                else "Preparando fotos…",
+                            color = GlassText.copy(alpha = 0.7f),
+                            fontSize = 18.sp
+                        )
+                    }
+                }
+            }
+
+            ParadiseInfoOverlays(
+                config = config,
+                slideshowState = slideshowState,
+                musicState = musicState,
+                weather = weatherInfo,
+                showDpadHint = !controlsShown && showParadiseDpadHint,
+                isTV = isTV
+            )
+
+            ParadiseThemeBadge(
+                visible = showThemeBadge,
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(16.dp)
+            )
+        } else {
         Box(
             modifier = Modifier
                 .fillMaxSize()
@@ -290,11 +426,13 @@ fun SlideshowScreen(
             }
         }
         }
+        }
 
-        if (config.playbackShowSafeBorder) {
+        if (!isParadise && config.playbackShowSafeBorder) {
             PlaybackSafeBorder(modifier = Modifier.fillMaxSize())
         }
 
+        if (!isParadise) {
         AnimatedVisibility(
             visible = showThemeBadge,
             enter = fadeIn(androidx.compose.animation.core.tween(300)),
@@ -357,15 +495,49 @@ fun SlideshowScreen(
                 )
             }
         }
+        }
 
-        // Aurora Glass: controles solo al pulsar OK/tocar (auto-ocultado).
-        // Ambiente y Galería: interfaz del tema SIEMPRE visible (como los mockups).
-        if (themeAlwaysVisible || showControls) {
+        if (isParadise && config.playbackShowSafeBorder) {
+            PlaybackSafeBorder(modifier = Modifier.fillMaxSize())
+        }
+
+        // Paradise: controles pill inferiores solo tras OK/tocar (4 s auto-hide en ViewModel).
+        if (isParadise) {
+            AnimatedVisibility(
+                visible = paradiseControlsVisible,
+                enter = fadeIn(animationSpec = tween(300)) +
+                    slideInVertically(animationSpec = tween(300)) { it / 2 },
+                exit = fadeOut(animationSpec = tween(400)) +
+                    slideOutVertically(animationSpec = tween(400)) { it / 2 },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            ) {
+                ParadiseScreensaverControls(
+                    slideshowState = slideshowState,
+                    config = config,
+                    onPlayPause = {
+                        touch()
+                        if (slideshowState.isPlaying) viewModel.pauseSlideshow()
+                        else viewModel.startSlideshow()
+                    },
+                    onSkipTrack = {
+                        touch()
+                        viewModel.skipNextTrack()
+                    },
+                    onMusicVolume = {
+                        touch()
+                        viewModel.setMusicVolume(it)
+                    },
+                    onInteraction = { viewModel.onControlsInteraction() },
+                    firstButtonFocus = if (isTV) paradiseFocus else null,
+                )
+            }
+        } else if (themeAlwaysVisible || showControls) {
+            val overlayConfig = config
             PlaybackControlsOverlay(
                 slideshowState = slideshowState,
-                config = config,
+                config = overlayConfig,
                 musicState = musicState,
-                pills = albumPills.map { it.id to it.label },
+                pills = albumPills,
                 selectedAlbumId = selectedAlbumId,
                 isTV = isTV,
                 controlHint = controlHint,
@@ -376,7 +548,7 @@ fun SlideshowScreen(
             )
         }
 
-        if (!showControls && !themeAlwaysVisible && showActionHint) {
+        if (!isParadise && !showControls && !themeAlwaysVisible && showActionHint) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)

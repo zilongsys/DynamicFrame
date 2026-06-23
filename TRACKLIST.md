@@ -1,5 +1,81 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Paradise: fondo negro + D-pad muerto + race condition vídeo (v0.1.80)
+- Estado: Completado (v0.1.80)
+- Descripción: (1) Fondo negro al abrir: SlideshowMediaViewport pintaba letterbox negro sobre el blur. (2) D-pad muerto: foco iba a pauseFocus (no montado en Paradise); nuevo paradiseFocus anclado al primer botón del pill. (3) Race condition de vídeo en crossfade externo: instancia saliente ya no monta SlideshowVideoPlayer.
+
+## 2026-06-22 — Paradise Bloque 11: verificación final
+- Estado: Completado (v0.1.79)
+- Descripción: Auditoría capas 1–10; fixes foco viñetas, ExoPlayer backdrop unificado, colores overlay.
+
+## 2026-06-22 — Paradise Bloque 10: auto-hide controles D-pad
+- Estado: Completado (v0.1.78)
+- Descripción: controlsVisible ViewModel 4 s; ParadiseScreensaverControls pill; OK/Enter en Box raíz; sin HUD permanente.
+
+## 2026-06-22 — Paradise Bloque 9: crossfade fotos
+- Estado: Completado (v0.1.77)
+- Descripción: AnimatedContent índice 1200 ms sharp + 800 ms blur; externalCrossfade en viewport; sin slide/zoom.
+
+## 2026-06-22 — Paradise Bloque 8: Ken Burns capa sharp
+- Estado: Completado (v0.1.76)
+- Descripción: paradiseKenBurns con InfiniteTransition; 4 direcciones aleatorias por foto; vídeo/blur sin efecto.
+
+## 2026-06-22 — Paradise Bloque 7: dots y hint D-pad
+- Estado: Completado (v0.1.75)
+- Descripción: ParadisePaginationDots bottom 16 dp; hint BottomEnd con timer 10 s y teclas TV (OK excluido).
+
+## 2026-06-22 — Paradise Bloque 6: pill música inferior centro
+- Estado: Completado (v0.1.74)
+- Descripción: ParadiseMusicPill con degradado naranja, borde glass; AnimatedVisibility si isPlaying y currentTrack.
+
+## 2026-06-22 — Paradise Bloque 5: atribución foto inferior derecha
+- Estado: Completado (v0.1.73)
+- Descripción: ParadisePhotoAttribution BottomEnd 44/52 dp; dos líneas sin fondo; visible solo con albumName.
+
+## 2026-06-22 — Paradise Bloque 4: widget clima
+- Estado: Completado (v0.1.72)
+- Descripción: ParadiseWeatherWidget top-right; WeatherUseCase, Open-Meteo, caché 30 min, oculto sin datos.
+
+## 2026-06-22 — Paradise Bloque 3: reloj inferior izquierdo
+- Estado: Completado (v0.1.71)
+- Descripción: ParadiseClock con formatos h:mm a y EEEE MMMM d, sin Card/fondo, burn-in ±3 dp cada 60 s.
+
+## 2026-06-22 — Paradise en tema reproducción + fix barras negras
+- Estado: Completado (v0.1.70)
+- Descripción: PlaybackTheme.PARADISE; sync con AppTheme; blur opaco y crop de respaldo.
+
+## 2026-06-22 — Fix build coil-transformations inexistente
+- Estado: Completado (v0.1.69)
+- Descripción: BlurTransformation local en ui/coil; quitada dependencia coil-transformations que no existe en Coil 2.6.
+
+## 2026-06-22 — Paradise Bloque 2: blurred background fill
+- Estado: Completado (v0.1.68)
+- Descripción: Relleno blur coherente en barras negras; fotos Coil BlurTransformation; vídeo segundo player blur (API 31+) o thumbnail blur (API &lt; 31).
+
+## 2026-06-22 — Tema Paradise (scaffolding + 5 capas visualizador)
+- Estado: Completado (v0.1.67) — Home/Ajustes Paradise pendientes
+- Descripción: AppTheme PARADISE, capas blur/sharp/viñetas/info/controles en SlideshowScreen; blur vídeo estático; LocalAppTheme.
+
+## 2026-06-22 — Barra volumen no navegable + hints ± música/vídeo
+- Estado: Completado (v0.1.66)
+- Descripción: En TV la pista de volumen es solo indicador; navegación con botones ± y descripciones «Subir/Bajar volumen de la música» o «del vídeo».
+
+## 2026-06-22 — Volúmenes más grandes con ± y HUD más bajo
+- Estado: Completado (v0.1.65)
+- Descripción: Sliders de volumen un poco más grandes con botones menos/más enfocables; franja inferior del HUD más compacta.
+
+## 2026-06-22 — Volúmenes inline en fila transporte + bolita de nivel
+- Estado: Completado (v0.1.64)
+- Descripción: Sliders de música/vídeo cortos en la misma fila que prev/next; thumb cyan visible en la posición del volumen.
+
+## 2026-06-22 — Miniatura 1.er vídeo en carpetas + volúmenes apilados (no paralelos)
+- Estado: Completado (v0.1.63)
+- Descripción: Miniatura del primer vídeo en píldoras de carpetas de video (Coil VideoFrameDecoder). Volumen vídeo restaurado y siempre visible; controles compactos uno debajo del otro con iconos música/vídeo.
+
+## 2026-06-22 — Aurora Glass: colores mockup, miniaturas álbum, volúmenes paralelos, play sobre HUD
+- Estado: Parcial (v0.1.62 — volúmenes corregidos en v0.1.63)
+- Descripción: Refinamiento tras captura TV: colores cyan/cristal idénticos al mockup; miniaturas en píldoras (1.ª foto del álbum); volumen vídeo compacto en paralelo con música; botón pause/play encima del panel de controles.
+
 ## 2026-06-22 — Aurora Glass fiel al mockup (eliminar steppers 40%/100% y morado genérico)
 - Estado: Completado (v0.1.61)
 - Descripción: Captura del usuario confirma que Aurora Glass cargaba pero se veía como UI genérica (panel blanco, botón play morado, steppers TvVolumeStepper 40%/100%). Rediseño completo con `AuroraGlassComponents.kt`: cyan eléctrico, halo en play, sliders finos, HUD oscuro, botones circulares, progreso cyan, reloj Aurora.

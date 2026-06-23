@@ -1,5 +1,126 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.80
+
+### Corregido
+- **Paradise — fondo negro al abrir**: `SlideshowMediaViewport` ya recibe `skipLetterboxBackground=true` desde Paradise. Sin este flag pintaba `PlaybackLetterboxBackground(BLACK)` encima del blur de fondo, tapando las áreas de letterbox con negro en vez de mostrar el blur. La capa blur (`ParadiseBlurBackdrop`) ya rellena esas zonas; la capa viewport no debe añadir fondo propio.
+- **Paradise — D-pad muerto al aparecer controles**: al hacer OK el `LaunchedEffect` de foco llamaba `pauseFocus.requestFocusWhenReady()`, pero `pauseFocus` solo está anclado en `PlaybackControlsOverlay` (no se muestra en Paradise). Añadido `paradiseFocus` (FocusRequester) anclado al primer botón de `ParadiseScreensaverControls`. El `LaunchedEffect` ahora usa `paradiseFocus` cuando `isParadise && controlsShown`.
+- **Paradise — carrera de reproductor de vídeo en transición**: el `AnimatedContent` externo compone dos instancias del viewport simultáneamente durante el crossfade. Ambas intentaban usar el `SlideshowVideoPlayerRepository` singleton. Ahora con `externalCrossfade=true` solo la instancia activa (`isPlaying=true`) monta `SlideshowVideoPlayer`; la instancia saliente (`isPlaying=false`) no lo renderiza y no dispara `stopIfCurrent` al desmontarse.
+
+### Añadido
+- `ParadiseScreensaverControls`: nuevo param `firstButtonFocus: FocusRequester?` y `focusGroup()` en la Row del pill para habilitar navegación D-pad entre los botones.
+
+## v0.1.79
+
+### Corregido
+- **Paradise — verificación Bloque 11:** viñetas no interceptan foco/toques; texto overlay solo `White.copy`; backdrop vídeo liberado junto al player principal; gradientes capa 3 sin hex en texto.
+
+## v0.1.78
+
+### Actualizado
+- **Paradise — Bloque 10:** controles ocultos por defecto; OK/Center muestra pill inferior (pause, skip, volumen) 4 s; `controlsVisible` en ViewModel.
+
+## v0.1.77
+
+### Actualizado
+- **Paradise — Bloque 9: crossfade** capa sharp 1200 ms y blur 800 ms vía `AnimatedContent` por índice; solo fade; Ken Burns reinicia por foto.
+
+## v0.1.76
+
+### Añadido
+- **Paradise — Bloque 8: Ken Burns** en capa sharp (solo fotos): zoom 1.0→1.04 en 30 s y pan aleatorio ±1 %; blur estático.
+
+## v0.1.75
+
+### Actualizado
+- **Paradise — Bloque 7:** dots de paginación (8 visibles, ancho animado 3→16 dp) y hint TV «▼  Settings» (10 s + fade 600 ms; OK abre controles).
+
+## v0.1.74
+
+### Actualizado
+- **Paradise — Bloque 6: pill de música** inferior centro (`BottomCenter`, 52 dp); fade 400 ms; visible solo con pista en reproducción.
+
+## v0.1.73
+
+### Actualizado
+- **Paradise — Bloque 5: atribución de foto** inferior derecha (álbum/carpeta + «Photo by …»), sin fondo; `AnimatedVisibility` solo con `albumName` válido.
+
+## v0.1.72
+
+### Añadido
+- **Paradise — Bloque 4: clima** en esquina superior derecha; `WeatherUseCase` + Open-Meteo (sin API key), geolocalización por IP, caché DataStore 30 min; oculto si falla o no hay red.
+
+## v0.1.71
+
+### Actualizado
+- **Paradise — Bloque 3: reloj** en esquina inferior izquierda (`h:mm a` + `EEEE, MMMM d`), tipografía sin fondo/sombra sobre viñetas, offset anti burn-in OLED cada 60 s.
+
+## v0.1.70
+
+### Corregido
+- **Paradise no activaba el fondo blur** si solo se cambiaba «Tema de la interfaz»: ahora **Paradise** es la 4.ª opción en reproducción y ambos selectores se sincronizan (`isParadiseActive()`).
+- **Barras negras visibles**: blur a opacidad plena (1.0); capa crop de respaldo bajo el blur en fotos.
+
+## v0.1.69
+
+### Corregido
+- **Build:** eliminada dependencia inexistente `io.coil-kt:coil-transformations:2.6.0` (Coil 2.x ya no la publica). `BlurTransformation` local en `ui/coil/`.
+
+## v0.1.68
+
+### Añadido
+- **Paradise — Bloque 2: blurred background fill** (solo tema Paradise):
+  - **Fotos:** `AppBlurFillImage` con Coil `BlurTransformation` (radius 25, sampling 4), crop, alpha 0.65, saturación 1.3.
+  - **Vídeos API 31+:** segundo `PlayerView` mudo (crop/zoom) con `RenderEffect` blur 40px; reproductor principal sigue en Fit (capa 2).
+  - **Vídeos API &lt; 31:** fotograma vía `MediaMetadataRetriever` + mismo blur que fotos.
+- Dependencia `coil-transformations` no existe en Coil 2.x; `BlurTransformation` copiada en `data/local/coil/`.
+
+## v0.1.67
+
+### Añadido
+- **Tema global Paradise** (`AppTheme.PARADISE`): selector en Ajustes → Visual → «Tema de la aplicación»; persistido en DataStore (`app_theme`). `LocalAppTheme` en toda la app vía `AppRoot`.
+- **Visualizador Paradise** (solo con Paradise activo): 5 capas — (1) blur crop de imagen o poster estático de vídeo, (2) medio sharp Fit sin letterbox, (3) tres viñetas degradadas, (4) overlays de info (reloj, chip música, atribución, puntos, hint), (5) controles auto-ocultos (HUD Aurora provisional).
+
+### Notas
+- Aurora Glass / Ambiente / Galería sin cambios cuando el tema de app es Memoria.
+- Weather: pendiente en Paradise. Blur vídeo: poster estático (Coil fotograma 0). API &lt; 31: fallback sin blur nativo.
+
+## v0.1.66
+
+### Actualizado
+- **Volúmenes Aurora Glass (TV)**: con botones ± activos, la barra de nivel es solo visual (no recibe foco ni ← →).
+- **Hints de ±** específicos: «Bajar/Subir volumen de la música» y «Bajar/Subir volumen del vídeo».
+
+## v0.1.65
+
+### Actualizado
+- **Volúmenes Aurora Glass más legibles**: pista 92 dp, icono 16 dp, bolita 12 dp; botones **±** enfocables a los lados para navegar con D-pad sin depender solo de ← →.
+- **Franja de controles más baja**: menos padding en el HUD, píldoras de álbum compactas (54 dp), barra de progreso fina y botones de transporte 42 dp en la fila inferior.
+
+## v0.1.64
+
+### Actualizado
+- **Aurora Glass — volúmenes en la fila de transporte**: música y vídeo con track corto (68 dp) entre anterior/siguiente y los botones de música, en la **misma línea** que replay/prev/next.
+- **Bolita de volumen visible**: thumb cyan posicionado según el nivel (incluido volumen 0), sobre pista fina con tramo activo degradado.
+
+## v0.1.63
+
+### Corregido
+- **Volumen de vídeo siempre visible** en Aurora Glass (cuando «Silenciar vídeo» está desactivado): ya no depende de que el slide actual sea un vídeo.
+- **Volúmenes apilados** (música arriba, vídeo abajo), compactos, con icono **MusicNote** / **Movie** según el medio.
+
+### Actualizado
+- **Miniaturas de carpetas de vídeo**: la píldora usa el **1.er vídeo** de la carpeta; Coil registra `VideoFrameDecoder` y `AppAsyncImage` pide el fotograma 0 para URIs de vídeo.
+
+## v0.1.62
+
+### Actualizado
+- **Aurora Glass — layout y miniaturas fieles al mockup**:
+  - Botón **play/pausa** centrado **justo encima** del HUD inferior (ya no flota en el centro de la pantalla).
+  - **Volúmenes de música y vídeo** en fila **paralela compacta** (`compact = true`), debajo de los botones de transporte.
+  - Píldoras de álbum con **miniatura real**: 1.ª foto del álbum/carpeta vía `AlbumPillOption.thumbnailUri` + `AppAsyncImage` (Coil); respaldo con `coverUri` del MediaStore.
+  - Paleta cyan eléctrico `#00E5FF` sobre cristal oscuro `#101828` / `#121E30` (sin morado genérico).
+
 ## v0.1.61
 
 ### Actualizado
