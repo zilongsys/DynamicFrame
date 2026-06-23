@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Temas Ambiente/Galería siempre visibles (fix raíz controles ocultos)
+- Estado: Completado (v0.1.60)
+- Descripción: El usuario confirmó que el badge de tema aparece pero los controles no cambian. Causa raíz: toda la UI temática estaba dentro de `AnimatedVisibility(showControls=false)` — sin pulsar OK solo se veía la foto. Ambiente y Galería ahora muestran su interfaz siempre (como los mockups); Aurora Glass mantiene auto-ocultado. Badge incluye versión para verificar build.
+
 ## 2026-06-22 — Rediseño fiel de los 3 temas de control (identidad propia por tema)
 - Estado: Completado (v0.1.59)
 - Descripción: El usuario confirmó que el indicador de tema aparece (build nuevo) pero los controles se veían iguales entre temas porque las 3 variantes compartían estilo glass + botón central idéntico. Se rehicieron fieles a los mockups: Ambiente (glifos planos blancos, play con halo morado, sin glass), Galería (riel bronce/oro a la derecha + placa de pergamino con serif), Aurora Glass (HUD glass). Nuevos botones por tema (`AmbientFlatIcon`, `AmbientPlayButton`, `GalleryRailButton`) con foco D-pad y hints. Se regeneraron las 3 imágenes de referencia.

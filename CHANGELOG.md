@@ -1,5 +1,12 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.60
+
+### Corregido
+- **Los temas Ambiente y Galería no se veían hasta pulsar OK/tocar**: toda la UI temática estaba dentro de `AnimatedVisibility(showControls)`, que arranca en `false`. Solo se veían la foto y el badge "Tema: …". Ahora **Ambiente** (barra inferior minimalista + halo morado) y **Galería** (riel bronce a la derecha + placa de pergamino) se muestran **siempre**, como en los mockups. Aurora Glass sigue ocultando controles hasta interactuar.
+- En TV, con Ambiente/Galería el foco entra directamente en los controles del tema (no hace falta pulsar OK primero).
+- El badge de diagnóstico incluye la versión (`Tema: Galería · v0.1.60`) para confirmar que el APK está actualizado.
+
 ## v0.1.59
 
 ### Actualizado

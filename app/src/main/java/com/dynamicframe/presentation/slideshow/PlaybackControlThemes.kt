@@ -89,6 +89,7 @@ fun PlaybackControlsOverlay(
     controlHint: String,
     pauseFocus: FocusRequester,
     bottomBarFocus: FocusRequester,
+    expanded: Boolean,
     cb: PlaybackControlsCallbacks
 ) {
     when (config.playbackTheme) {

@@ -137,7 +137,8 @@ fun SlideshowScreen(
     val screenFocus = remember { FocusRequester() }
     val pauseFocus = remember { FocusRequester() }
     val bottomBarFocus = remember { FocusRequester() }
-    val backgroundCapturesFocus = isTV && !showControls
+    val themeAlwaysVisible = config.playbackTheme != PlaybackTheme.AURORA_GLASS
+    val backgroundCapturesFocus = isTV && !showControls && !themeAlwaysVisible
     var backNavigationEnabled by remember { mutableStateOf(!isTV) }
 
     LaunchedEffect(Unit) {
@@ -147,10 +148,10 @@ fun SlideshowScreen(
         }
     }
 
-    LaunchedEffect(showControls, isTV) {
+    LaunchedEffect(showControls, isTV, themeAlwaysVisible) {
         if (!isTV) return@LaunchedEffect
         delay(150)
-        if (showControls) pauseFocus.requestFocusWhenReady()
+        if (showControls || themeAlwaysVisible) pauseFocus.requestFocusWhenReady()
         else screenFocus.requestFocusWhenReady()
     }
 
@@ -306,7 +307,7 @@ fun SlideshowScreen(
             }
             GlassSurface(cornerRadius = 12.dp) {
                 Text(
-                    text = "Tema: $themeName",
+                    text = "Tema: $themeName · ${AppVersion.shortLabel()}",
                     color = GlassText,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.Medium,
@@ -329,11 +330,9 @@ fun SlideshowScreen(
             )
         }
 
-        AnimatedVisibility(
-            visible = showControls,
-            enter = fadeIn(androidx.compose.animation.core.tween(280)),
-            exit = fadeOut(androidx.compose.animation.core.tween(240))
-        ) {
+        // Aurora Glass: controles solo al pulsar OK/tocar (auto-ocultado).
+        // Ambiente y Galería: interfaz del tema SIEMPRE visible (como los mockups).
+        if (themeAlwaysVisible || showControls) {
             PlaybackControlsOverlay(
                 slideshowState = slideshowState,
                 config = config,
@@ -344,11 +343,12 @@ fun SlideshowScreen(
                 controlHint = controlHint,
                 pauseFocus = pauseFocus,
                 bottomBarFocus = bottomBarFocus,
+                expanded = showControls || themeAlwaysVisible,
                 cb = callbacks
             )
         }
 
-        if (!showControls && showActionHint) {
+        if (!showControls && !themeAlwaysVisible && showActionHint) {
             Box(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
