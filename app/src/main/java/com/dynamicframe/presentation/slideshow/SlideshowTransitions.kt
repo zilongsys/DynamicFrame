@@ -17,10 +17,9 @@ fun AnimatedContentTransitionScope<MediaItem>.slideshowTransitionSpec(
     durationMs: Int
 ): ContentTransform {
     val ms = transitionMillis(type, durationMs)
-    if (ms <= 0) return EnterTransition.None togetherWith ExitTransition.None
 
-    val enterTween = tween<Float>(durationMillis = ms, easing = SoftEasing)
-    val exitTween = tween<Float>(durationMillis = (ms * 0.88f).toInt(), easing = SoftEasing)
+    val enterTween = tween<Float>(durationMillis = ms.coerceAtLeast(1), easing = SoftEasing)
+    val exitTween = tween<Float>(durationMillis = (ms * 0.88f).toInt().coerceAtLeast(1), easing = SoftEasing)
     val enterOffsetTween = tween<IntOffset>(durationMillis = ms, easing = DramaticEasing)
     val exitOffsetTween = tween<IntOffset>(durationMillis = (ms * 0.88f).toInt(), easing = DramaticEasing)
     val wipeTween = tween<IntOffset>(durationMillis = ms, easing = SnapEasing)
@@ -148,6 +147,6 @@ fun AnimatedContentTransitionScope<MediaItem>.slideshowTransitionSpec(
                 )
         }
 
-        TransitionType.NONE -> EnterTransition.None togetherWith ExitTransition.None
+        TransitionType.NONE -> fadeIn(tween(1, easing = LinearEasing)) togetherWith fadeOut(tween(1, easing = LinearEasing))
     }
 }

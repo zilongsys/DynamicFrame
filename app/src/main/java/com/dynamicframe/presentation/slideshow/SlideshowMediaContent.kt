@@ -2,26 +2,43 @@ package com.dynamicframe.presentation.slideshow
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.ExperimentalAnimationApi
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.Text
-import androidx.compose.runtime.*
-import androidx.compose.ui.Alignment
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalDensity
+import com.dynamicframe.domain.model.MediaDynamicPalette
 import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.model.MediaType
+import com.dynamicframe.domain.model.PlaybackBackgroundType
 import com.dynamicframe.domain.model.TransitionType
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
-import com.dynamicframe.ui.components.AppAsyncImage
+import com.dynamicframe.domain.slideshow.DynamicBackdropPrefetcher
+import com.dynamicframe.domain.slideshow.transitionMillis
+import com.dynamicframe.ui.components.AppSharpImageWhenReady
+import com.dynamicframe.ui.components.rememberAppImagePainter
 import com.dynamicframe.ui.theme.PlaybackLetterboxBackground
+import coil.compose.AsyncImagePainter
 import kotlin.math.roundToInt
+import kotlinx.coroutines.delay
+
+/** Diapositiva completa (fondo + foto) lista para retener o mostrar. */
+private data class HeldSlide(
+    val itemId: String,
+    val uri: String,
+    val palette: MediaDynamicPalette?,
+)
 
 @OptIn(ExperimentalAnimationApi::class)
 @Composable
@@ -41,33 +58,70 @@ fun SlideshowMediaViewport(
     onVideoEnded: () -> Unit,
     onPlaybackError: () -> Unit = onVideoEnded,
     onPreloadImages: (List<String>, Int, Int) -> Unit = { _, _, _ -> },
-    backgroundType: com.dynamicframe.domain.model.PlaybackBackgroundType = com.dynamicframe.domain.model.PlaybackBackgroundType.BLACK,
+    backgroundType: PlaybackBackgroundType = PlaybackBackgroundType.BLACK,
     backgroundImageUri: String = "",
-    /** Paradise: el fondo lo aporta la capa blur; no pintar letterbox aquí. */
+    dynamicPalette: MediaDynamicPalette? = null,
+    dynamicPalettes: Map<String, MediaDynamicPalette> = emptyMap(),
+    videoBlurThumbnailUri: String? = null,
     skipLetterboxBackground: Boolean = false,
-    /** Paradise: crossfade en [ParadiseSlideshowMediaStack]; sin AnimatedContent interno. */
     externalCrossfade: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val decodeSize = rememberMaxDecodeSize()
     val isVideo = currentItem.type == MediaType.VIDEO
+    val useDynamicBackground = backgroundType == PlaybackBackgroundType.DYNAMIC && !skipLetterboxBackground
+    val dynamicBackgroundInTransition = useDynamicBackground && !isVideo && !externalCrossfade
+    val dynamicDecodeW = DynamicBackdropPrefetcher.DECODE_WIDTH
+    val dynamicDecodeH = DynamicBackdropPrefetcher.DECODE_HEIGHT
 
-    val effectiveTransition = if (externalCrossfade || isVideo || nextItem?.type == MediaType.VIDEO) {
-        TransitionType.NONE
-    } else {
-        transitionType
+    val effectiveTransition = when {
+        externalCrossfade || isVideo -> TransitionType.NONE
+        else -> transitionType
     }
 
     LaunchedEffect(currentItem.id, nextItem?.id, currentIndex, playlistItems.size) {
         val uris = linkedSetOf<String>()
         if (!isVideo) uris.add(currentItem.uri)
         nextItem?.takeIf { it.type == MediaType.IMAGE }?.uri?.let { uris.add(it) }
-        onPreloadImages(uris.toList(), decodeSize.first, decodeSize.second)
+        val w = if (dynamicBackgroundInTransition) dynamicDecodeW else decodeSize.first
+        val h = if (dynamicBackgroundInTransition) dynamicDecodeH else decodeSize.second
+        onPreloadImages(uris.toList(), w, h)
     }
 
-    // Foto previa para fundidos suaves imagen→imagen. Se conserva al entrar en modo
-    // vídeo (la foto puede ser útil para la transición vídeo→imagen de vuelta).
-    var underlayUri by remember { mutableStateOf<String?>(null) }
+    var heldSlide by remember { mutableStateOf<HeldSlide?>(null) }
+    var compositeReady by remember { mutableStateOf<HeldSlide?>(null) }
+
+    LaunchedEffect(currentItem.id) {
+        compositeReady = null
+    }
+
+    // Retención: solo tras transición Y cuando foto+fondo están listos (evita fondo solo / blanco).
+    LaunchedEffect(
+        compositeReady?.itemId,
+        currentItem.id,
+        transitionDurationMs,
+        effectiveTransition,
+    ) {
+        val ready = compositeReady ?: return@LaunchedEffect
+        if (ready.itemId != currentItem.id) return@LaunchedEffect
+        val delayMs = if (heldSlide == null) {
+            0L
+        } else {
+            transitionMillis(effectiveTransition, transitionDurationMs).coerceAtLeast(1).toLong() + 32L
+        }
+        delay(delayMs)
+        if (compositeReady?.itemId == currentItem.id) {
+            heldSlide = ready
+        }
+    }
+
+    fun onSlideCompositeReady(item: MediaItem, palette: MediaDynamicPalette?) {
+        compositeReady = HeldSlide(
+            itemId = item.id,
+            uri = item.uri,
+            palette = if (dynamicBackgroundInTransition) palette else null,
+        )
+    }
 
     Box(
         modifier = modifier
@@ -75,71 +129,87 @@ fun SlideshowMediaViewport(
             .focusable(enabled = false)
     ) {
         if (!skipLetterboxBackground) {
-            PlaybackLetterboxBackground(
-                type = backgroundType,
-                customImageUri = backgroundImageUri,
-                modifier = Modifier.fillMaxSize()
-            )
+            when {
+                useDynamicBackground && isVideo -> {
+                    DynamicLetterboxBackground(
+                        mediaUri = currentItem.uri,
+                        mediaType = currentItem.type,
+                        palette = dynamicPalette ?: dynamicPalettes[currentItem.id],
+                        isPlaying = isPlaying,
+                        playToken = playToken,
+                        videoBackdropPlayer = videoBackdropPlayer,
+                        videoBlurThumbnailUri = videoBlurThumbnailUri,
+                        animateImageLoad = false,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
+                backgroundType != PlaybackBackgroundType.DYNAMIC -> {
+                    PlaybackLetterboxBackground(
+                        type = backgroundType,
+                        customImageUri = backgroundImageUri,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            }
         }
 
-        // Underlay (foto previa) solo bajo imágenes para fundidos suaves.
         if (!externalCrossfade && !isVideo) {
-            underlayUri?.let { uri ->
-                SlideshowImageContent(
-                    uri = uri,
-                    transitionType = TransitionType.NONE,
-                    modifier = Modifier.fillMaxSize()
+            heldSlide?.let { held ->
+                RetainedCompleteImageSlide(
+                    target = held,
+                    dynamicBackground = dynamicBackgroundInTransition,
+                    decodeWidth = if (dynamicBackgroundInTransition) dynamicDecodeW else decodeSize.first,
+                    decodeHeight = if (dynamicBackgroundInTransition) dynamicDecodeH else decodeSize.second,
                 )
             }
         }
 
         if (externalCrossfade && !isVideo) {
-            SlideshowImageContent(
+            CompleteImageSlide(
                 uri = currentItem.uri,
-                transitionType = TransitionType.NONE,
+                palette = null,
+                dynamicBackground = false,
                 decodeWidth = decodeSize.first,
                 decodeHeight = decodeSize.second,
-                modifier = Modifier.fillMaxSize(),
-                onLoadError = onPlaybackError,
+                onError = onPlaybackError,
             )
         } else if (!isVideo) {
-        // Imágenes con transición animada. targetState es siempre MediaItem para que
-        // slideshowTransitionSpec (tipado sobre MediaItem) compile sin cambios.
-        // Cuando el ítem es vídeo, el lambda no renderiza nada (el vídeo se dibuja
-        // en la capa de abajo separada del AnimatedContent).
-        AnimatedContent(
-            targetState = currentItem,
-            contentKey = { it.id },
-            transitionSpec = {
-                slideshowTransitionSpec(effectiveTransition, transitionDurationMs)
-            },
-            label = "slide_transition",
-            modifier = Modifier.fillMaxSize()
-        ) { item ->
-            if (item.type == MediaType.IMAGE) {
-                SlideshowImageContent(
-                    uri = item.uri,
-                    transitionType = effectiveTransition,
-                    decodeWidth = decodeSize.first,
-                    decodeHeight = decodeSize.second,
-                    modifier = Modifier.fillMaxSize(),
-                    onDisplayed = { underlayUri = item.uri },
-                    onLoadError = onPlaybackError
-                )
+            AnimatedContent(
+                targetState = currentItem,
+                contentKey = { it.id },
+                transitionSpec = {
+                    slideshowTransitionSpec(effectiveTransition, transitionDurationMs)
+                },
+                label = "slide_transition",
+                modifier = Modifier.fillMaxSize()
+            ) { item ->
+                val slidePalette = remember(item.id, dynamicPalettes[item.id]) {
+                    dynamicPalettes[item.id]
+                }
+                if (dynamicBackgroundInTransition) {
+                    CompleteImageSlide(
+                        uri = item.uri,
+                        palette = slidePalette,
+                        dynamicBackground = true,
+                        decodeWidth = dynamicDecodeW,
+                        decodeHeight = dynamicDecodeH,
+                        onError = onPlaybackError,
+                        onSuccess = { onSlideCompositeReady(item, slidePalette) },
+                    )
+                } else if (item.type == MediaType.IMAGE) {
+                    CompleteImageSlide(
+                        uri = item.uri,
+                        palette = null,
+                        dynamicBackground = false,
+                        decodeWidth = decodeSize.first,
+                        decodeHeight = decodeSize.second,
+                        onError = onPlaybackError,
+                        onSuccess = { onSlideCompositeReady(item, null) },
+                    )
+                }
             }
         }
-        }
 
-        // Reproductor de vídeo FUERA de AnimatedContent: así no se recrea al cambiar
-        // de un vídeo a otro (solo cambian uri y playToken). Gracias a
-        // keepContentOnPlayerReset el último frame permanece visible mientras el
-        // nuevo vídeo carga, eliminando el flash negro entre vídeos.
-        //
-        // En modo externalCrossfade (Paradise), el AnimatedContent externo compone
-        // dos instancias simultáneamente durante la transición. Ambas usarían el mismo
-        // player singleton causando una carrera. El guard isPlaying limita el player
-        // a la instancia activa (isPlaying=true); la instancia saliente no lo monta
-        // y por tanto su DisposableEffect no llama stopIfCurrent al desmontarse.
         if (isVideo && (!externalCrossfade || isPlaying)) {
             SlideshowVideoPlayer(
                 videoPlayer = videoPlayer,
@@ -154,6 +224,102 @@ fun SlideshowMediaViewport(
                 modifier = Modifier.fillMaxSize()
             )
         }
+    }
+}
+
+/** Capa de retención: mantiene la diapositiva anterior visible hasta que la nueva esté en caché. */
+@Composable
+private fun RetainedCompleteImageSlide(
+    target: HeldSlide,
+    dynamicBackground: Boolean,
+    decodeWidth: Int,
+    decodeHeight: Int,
+) {
+    var displayed by remember { mutableStateOf<HeldSlide?>(null) }
+
+    val incomingPainter = rememberAppImagePainter(
+        uri = target.uri,
+        decodeWidth = decodeWidth,
+        decodeHeight = decodeHeight,
+    )
+    LaunchedEffect(incomingPainter.state, target.itemId) {
+        if (incomingPainter.state is AsyncImagePainter.State.Success) {
+            displayed = target
+        }
+    }
+
+    val slide = displayed ?: return
+    val showPainter = rememberAppImagePainter(
+        uri = slide.uri,
+        decodeWidth = decodeWidth,
+        decodeHeight = decodeHeight,
+    )
+    if (showPainter.state !is AsyncImagePainter.State.Success) return
+
+    PaintedCompleteImageSlide(
+        uri = slide.uri,
+        palette = slide.palette,
+        painter = showPainter,
+        dynamicBackground = dynamicBackground,
+    )
+}
+
+/** Fondo dinámico + foto nítida: siempre juntos, solo cuando Coil confirma la imagen. */
+@Composable
+private fun CompleteImageSlide(
+    uri: String,
+    palette: MediaDynamicPalette?,
+    dynamicBackground: Boolean,
+    decodeWidth: Int,
+    decodeHeight: Int,
+    onError: () -> Unit = {},
+    onSuccess: () -> Unit = {},
+) {
+    AppSharpImageWhenReady(
+        uri = uri,
+        decodeWidth = decodeWidth,
+        decodeHeight = decodeHeight,
+        modifier = Modifier.fillMaxSize(),
+        onError = onError,
+        onSuccess = onSuccess,
+    ) { painter ->
+        PaintedCompleteImageSlide(
+            uri = uri,
+            palette = palette,
+            painter = painter,
+            dynamicBackground = dynamicBackground,
+        )
+    }
+}
+
+@Composable
+private fun PaintedCompleteImageSlide(
+    uri: String,
+    palette: MediaDynamicPalette?,
+    painter: AsyncImagePainter,
+    dynamicBackground: Boolean,
+) {
+    Box(Modifier.fillMaxSize()) {
+        if (dynamicBackground) {
+            DynamicLetterboxBackground(
+                mediaUri = uri,
+                mediaType = MediaType.IMAGE,
+                palette = palette,
+                isPlaying = false,
+                playToken = 0,
+                videoBackdropPlayer = null,
+                videoBlurThumbnailUri = null,
+                animateImageLoad = false,
+                showSharpCrop = false,
+                modifier = Modifier.fillMaxSize(),
+            )
+        }
+        Image(
+            painter = painter,
+            contentDescription = null,
+            contentScale = ContentScale.Fit,
+            modifier = Modifier.fillMaxSize(),
+        )
     }
 }
 
@@ -173,6 +339,7 @@ fun SlideshowImageContent(
     modifier: Modifier = Modifier,
     decodeWidth: Int? = null,
     decodeHeight: Int? = null,
+    crossfadeMillis: Int = 0,
     onDisplayed: (() -> Unit)? = null,
     onLoadError: (() -> Unit)? = null
 ) {
@@ -180,33 +347,24 @@ fun SlideshowImageContent(
     val targetWidth = decodeWidth ?: size.first
     val targetHeight = decodeHeight ?: size.second
 
-    var loadFailed by remember(uri) { mutableStateOf(false) }
-
-    Box(modifier) {
-        AppAsyncImage(
-            uri = uri,
+    AppSharpImageWhenReady(
+        uri = uri,
+        decodeWidth = targetWidth,
+        decodeHeight = targetHeight,
+        modifier = modifier,
+        onError = { onLoadError?.invoke() },
+        onSuccess = { onDisplayed?.invoke() },
+    ) { painter ->
+        Image(
+            painter = painter,
+            contentDescription = null,
             contentScale = ContentScale.Fit,
-            decodeWidth = targetWidth,
-            decodeHeight = targetHeight,
             modifier = Modifier
                 .fillMaxSize()
                 .graphicsLayer {
                     scaleX = 1f
                     scaleY = 1f
                 },
-            onSuccess = {
-                loadFailed = false
-                onDisplayed?.invoke()
-            },
-            onError = {
-                loadFailed = true
-                onLoadError?.invoke()
-            }
         )
-        if (loadFailed) {
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("No se pudo cargar", color = Color.White.copy(alpha = 0.45f))
-            }
-        }
     }
 }

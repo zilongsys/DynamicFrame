@@ -5,6 +5,7 @@ import com.dynamicframe.domain.model.StorageSubfolder
 import com.dynamicframe.domain.playback.SlideshowMusicCoordinator
 import com.dynamicframe.domain.repository.MusicPlaybackRepository
 import com.dynamicframe.domain.repository.StorageBrowserRepository
+import com.dynamicframe.domain.repository.VideoThumbnailRepository
 import com.dynamicframe.domain.slideshow.SlideshowEngine
 import kotlinx.coroutines.flow.StateFlow
 import com.dynamicframe.domain.model.MusicPlayerState
@@ -48,4 +49,11 @@ class PauseAppPlaybackUseCase @Inject constructor(
         slideshowEngine.pause()
         musicCoordinator.disconnect()
     }
+}
+
+class GetVideoBlurThumbnailUseCase @Inject constructor(
+    private val videoThumbnailRepository: VideoThumbnailRepository
+) {
+    suspend operator fun invoke(mediaUri: String): Result<String?> =
+        videoThumbnailRepository.extractBlurFrameUri(mediaUri)
 }

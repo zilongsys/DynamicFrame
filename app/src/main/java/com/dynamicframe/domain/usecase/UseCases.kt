@@ -145,6 +145,20 @@ class PreloadSlideshowImagesUseCase @Inject constructor(
     operator fun invoke(uris: Iterable<String>, width: Int, height: Int) {
         uris.forEach { uri -> imageCacheRepository.preload(uri, width, height) }
     }
+
+    suspend fun awaitSharp(uris: Iterable<String>, width: Int, height: Int) {
+        uris.forEach { uri -> imageCacheRepository.preloadAndAwait(uri, width, height) }
+    }
+
+    suspend fun awaitBlur(
+        uri: String,
+        width: Int,
+        height: Int,
+        blurRadius: Float = 25f,
+        blurSampling: Float = 5f,
+    ) {
+        imageCacheRepository.preloadBlurAndAwait(uri, width, height, blurRadius, blurSampling)
+    }
 }
 
 @Singleton

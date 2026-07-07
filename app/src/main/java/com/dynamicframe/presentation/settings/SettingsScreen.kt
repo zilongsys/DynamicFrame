@@ -498,8 +498,12 @@ fun SettingsScreen(
                         icon = Icons.Default.Animation,
                         currentValue = config.transition.displayName(),
                         options = TransitionType.entries.map { it.displayName() },
-                        note = "Efecto visual entre una foto y la siguiente.",
+                        note = config.transition.effectDescription(),
                         onSelect = { idx -> viewModel.updateTransition(TransitionType.entries[idx]) }
+                    )
+                    SlideshowTransitionPreview(
+                        transitionType = config.transition,
+                        durationMs = config.transitionDurationMs,
                     )
                     SettingsSliderItem(
                         title = "Duración de transición",
@@ -538,13 +542,46 @@ fun SettingsScreen(
                     intro = "Toca/OK en pantalla completa para pausar. Los controles se ocultan solos."
                 ) {
                     SettingsDropdownItem(
+                        title = "Tema de la aplicación",
+                        icon = Icons.Default.Palette,
+                        currentValue = config.appTheme.appThemeDisplayName(),
+                        options = AppTheme.entries.map { it.appThemeDisplayName() },
+                        note = "Paradise: visualizador con fondo blur, viñetas y capas inmersivas (en construcción). Memoria: apariencia clásica de la app.",
+                        onSelect = { idx ->
+                            val theme = AppTheme.entries[idx]
+                            viewModel.updateConfig(
+                                config.copy(
+                                    appTheme = theme,
+                                    playbackTheme = if (theme == AppTheme.PARADISE) {
+                                        PlaybackTheme.PARADISE
+                                    } else {
+                                        config.playbackTheme
+                                    }
+                                )
+                            )
+                        }
+                    )
+                    SettingsDropdownItem(
                         title = "Tema de la interfaz",
                         icon = Icons.Default.Style,
                         currentValue = config.playbackTheme.playbackThemeDisplayName(),
                         options = PlaybackTheme.entries.map { it.playbackThemeDisplayName() },
-                        note = "Estilo en pantalla completa: Aurora Glass (HUD moderno, marco dorado opcional), Ambiente (a sangre, sin marco) o Galería (paspartú de museo con placa).",
+                        note = "Paradise: fondo blur que rellena las barras negras + capas inmersivas. Aurora Glass, Ambiente o Galería: estilo de controles (con Paradise activo, el fondo blur sigue aplicándose).",
                         onSelect = { idx ->
-                            viewModel.updateConfig(config.copy(playbackTheme = PlaybackTheme.entries[idx]))
+                            val theme = PlaybackTheme.entries[idx]
+                            viewModel.updateConfig(
+                                config.copy(
+                                    playbackTheme = theme,
+                                    appTheme = when (theme) {
+                                        PlaybackTheme.PARADISE -> AppTheme.PARADISE
+                                        else -> if (config.appTheme == AppTheme.PARADISE) {
+                                            AppTheme.DEFAULT
+                                        } else {
+                                            config.appTheme
+                                        }
+                                    }
+                                )
+                            )
                         }
                     )
                     SettingsSwitchItem(
@@ -577,7 +614,7 @@ fun SettingsScreen(
                         icon = Icons.Default.Wallpaper,
                         currentValue = config.playbackBackgroundType.playbackBackgroundDisplayName(),
                         options = PlaybackBackgroundType.entries.map { it.playbackBackgroundDisplayName() },
-                        note = "Rellena el espacio alrededor de fotos que no ocupan toda la pantalla.",
+                        note = "Rellena el espacio alrededor de fotos y vídeos. «Dinámico» usa los colores predominantes y un blur de la propia imagen. Ignorado con el tema Paradise (capa blur propia).",
                         onSelect = { idx ->
                             viewModel.updateConfig(config.copy(playbackBackgroundType = PlaybackBackgroundType.entries[idx]))
                         }
@@ -1110,6 +1147,12 @@ fun PlaybackTheme.playbackThemeDisplayName() = when (this) {
     PlaybackTheme.AURORA_GLASS -> "Aurora Glass (recomendado)"
     PlaybackTheme.AMBIENT -> "Ambiente (minimalista)"
     PlaybackTheme.GALLERY -> "Galería (museo)"
+    PlaybackTheme.PARADISE -> "Paradise (fondo blur)"
+}
+
+fun AppTheme.appThemeDisplayName() = when (this) {
+    AppTheme.DEFAULT -> "Memoria (clásico)"
+    AppTheme.PARADISE -> "Paradise (inmersivo)"
 }
 
 /**
@@ -1286,6 +1329,7 @@ private fun PlaybackBackgroundPreviewRow(
     onSelect: (PlaybackBackgroundType) -> Unit
 ) {
     val demos = listOf(
+        PlaybackBackgroundType.DYNAMIC to "Dinámico",
         PlaybackBackgroundType.DEMO_LAVENDER to "Lavanda",
         PlaybackBackgroundType.DEMO_SUNSET to "Atardecer",
         PlaybackBackgroundType.DEMO_MIDNIGHT to "Noche",

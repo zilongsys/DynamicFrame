@@ -1,5 +1,69 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Fix fondo solo + cuadro blanco (CompleteImageSlide)
+- Estado: Completado
+- Descripción: Caché Coil alineada precarga/UI; RetainedCompleteImageSlide en capa held; fondo+foto juntos en Success.
+
+## 2026-06-22 — Fix cuadro blanco intermitente en transición
+- Estado: Completado
+- Descripción: HeldSlide tras transición; AppImage solo en Success; Coil global sin crossfade.
+
+## 2026-06-22 — Fix flash negro entre transiciones slideshow
+- Estado: Completado
+- Descripción: Capa HeldSlide bajo AnimatedContent; NONE con swap 1ms; sin Box vacío en AppImageWhenReady.
+
+## 2026-06-22 — Demo transiciones en Ajustes Slideshow
+- Estado: Completado
+- Descripción: SlideshowTransitionPreview + effectDescription() por cada TransitionType.
+
+## 2026-06-22 — Dinámico: sin «solo fondo» + transición configurada
+- Estado: Completado
+- Descripción: AppImageWhenReady oculta slide hasta imagen en caché; transición ya no se anula si el siguiente es vídeo.
+
+## 2026-06-22 — Fondo dinámico: sync real fondo+foto sin parpadeo
+- Estado: Completado
+- Descripción: Misma caché 960×540; sin underlay ni crossfade Coil; paleta congelada por slide; AppAsyncImage con remember.
+
+## 2026-06-22 — Fondo dinámico: sync fondo+foto + inicio tras carga real
+- Estado: Completado
+- Descripción: Fondo dinámico dentro de AnimatedContent; listo=paleta+nítida+blur; música/slideshow tras awaitFirstSlideReady.
+
+## 2026-06-22 — Fix compile: import launch en DynamicBackdropPrefetcher
+- Estado: Completado
+- Descripción: Añadido `import kotlinx.coroutines.launch` para blur en segundo plano.
+
+## 2026-06-22 — Fondo dinámico: arquitectura correcta (gate motor + caché blur)
+- Estado: Completado
+- Descripción: Motor espera backdrop antes de cambiar slide; ventana rolling 5; sin displayedSlide; caché Coil alineada; música sin pausas entre slides.
+
+## 2026-06-22 — Fondo dinámico: ventana rolling + música continua
+- Estado: Superseded
+- Descripción: DynamicBackdropPrefetcher (actual+5 slides); displayedSlide desacoplado del motor; sin haltAllPlayback entre slides; refreshPlaylist mantiene isPlaying.
+
+## 2026-06-22 — Fase Presenting: sin música ni UI hasta listo
+- Estado: Completado
+- Descripción: SlideshowPresentationPhase + playbackAllowed en música; viewport oculto en Preparing.
+
+## 2026-06-22 — Fondo dinámico: fix carga infinita + silencio hasta listo
+- Estado: Completado
+- Descripción: Sin awaitBlur bloqueante; timeout 5s; readyId siempre en finally; música pausada hasta backdrop listo.
+
+## 2026-06-22 — Fondo dinámico: cargando hasta listo (1ª foto)
+- Estado: Completado
+- Descripción: enterSlideshowFullscreen prepara paleta+blur+imagen; overlay «Preparando fondo…»; timer pausado hasta listo.
+
+## 2026-06-22 — Fondo dinámico: paleta instantánea
+- Estado: Completado
+- Descripción: Caché LRU de paletas + precarga slide actual/siguiente y primeras 3; degradado listo al cambiar foto.
+
+## 2026-06-22 — Fondo dinámico: opaco + grano
+- Estado: Completado
+- Descripción: Blur al 100 %, sampling 5 y capa FilmGrainOverlay sobre letterbox dinámico.
+
+## 2026-06-22 — Fondo letterbox dinámico (colores + blur)
+- Estado: Completado (v0.1.80)
+- Descripción: PlaybackBackgroundType.DYNAMIC; paleta dominante + blur crop; vídeos con backdrop como Paradise.
+
 ## 2026-06-22 — Paradise: fondo negro + D-pad muerto + race condition vídeo (v0.1.80)
 - Estado: Completado (v0.1.80)
 - Descripción: (1) Fondo negro al abrir: SlideshowMediaViewport pintaba letterbox negro sobre el blur. (2) D-pad muerto: foco iba a pauseFocus (no montado en Paradise); nuevo paradiseFocus anclado al primer botón del pill. (3) Race condition de vídeo en crossfade externo: instancia saliente ya no monta SlideshowVideoPlayer.

@@ -132,7 +132,12 @@ data class SlideshowConfig(
     /** URI de imagen personalizada para fondo (si type = CUSTOM_IMAGE) */
     val playbackBackgroundImageUri: String = "",
     /** Estilo de interfaz (tema) de la pantalla de reproducción */
-    val playbackTheme: PlaybackTheme = PlaybackTheme.AURORA_GLASS
+    val playbackTheme: PlaybackTheme = PlaybackTheme.AURORA_GLASS,
+    /**
+     * Tema global de la aplicación. [AppTheme.PARADISE] activa capas y UI Paradise
+     * en visualizador (y futuras pantallas); [AppTheme.DEFAULT] conserva Memoria actual.
+     */
+    val appTheme: AppTheme = AppTheme.DEFAULT
 ) {
     /** Compatibilidad: primera fuente activa, o DEVICE_LIBRARY si no hay ninguna */
     val musicSourceType: MusicSourceType
@@ -158,7 +163,9 @@ enum class PlaybackBackgroundType {
     DEMO_LAVENDER,
     DEMO_SUNSET,
     DEMO_MIDNIGHT,
-    CUSTOM_IMAGE
+    CUSTOM_IMAGE,
+    /** Colores dominantes de la foto/vídeo + relleno blur en letterbox. */
+    DYNAMIC,
 }
 
 /**
@@ -166,12 +173,25 @@ enum class PlaybackBackgroundType {
  * - [AURORA_GLASS]: glassmorphism unificado con HUD inferior (por defecto).
  * - [AMBIENT]: minimalismo cinematográfico, controles mínimos centrados.
  * - [GALLERY]: marco editorial tipo museo, riel lateral + placa de datos.
+ * - [PARADISE]: capas blur + viñetas (sincronizado con [AppTheme.PARADISE]).
  */
 enum class PlaybackTheme {
     AURORA_GLASS,
     AMBIENT,
-    GALLERY
+    GALLERY,
+    /** Capas blur + viñetas Paradise en pantalla completa (sincroniza con [AppTheme.PARADISE]). */
+    PARADISE
 }
+
+/** Tema global de la app (Paradise vs apariencia Memoria por defecto). */
+enum class AppTheme {
+    DEFAULT,
+    PARADISE
+}
+
+/** Paradise activo en pantalla completa (cualquiera de los dos selectores de Ajustes). */
+fun SlideshowConfig.isParadiseActive(): Boolean =
+    appTheme == AppTheme.PARADISE || playbackTheme == PlaybackTheme.PARADISE
 
 enum class TransitionType {
     CROSSFADE,

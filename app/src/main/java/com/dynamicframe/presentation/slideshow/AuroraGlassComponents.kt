@@ -38,17 +38,24 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.dynamicframe.presentation.device.LocalDeviceProfile
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.style.TextOverflow
+import com.dynamicframe.ui.components.AppAsyncImage
 import com.dynamicframe.ui.theme.FocusHintEffect
 import com.dynamicframe.ui.theme.safeClickable
 
-/** Paleta Aurora Glass — cyan eléctrico sobre cristal oscuro (mockup HUD). */
+/** Paleta Aurora Glass — idéntica al mockup (cyan eléctrico + cristal azul oscuro). */
 val AuroraCyan = Color(0xFF00E5FF)
+val AuroraCyanBright = Color(0xFF66F0FF)
 val AuroraCyanDim = Color(0x9900E5FF)
-val AuroraGlassDark = Color(0xCC081220)
-val AuroraGlassDeep = Color(0x99081220)
-val AuroraGlassBorder = Color(0x4D00E5FF)
-val AuroraText = Color(0xF2FFFFFF)
-val AuroraTextMuted = Color(0xB3FFFFFF)
+val AuroraGlassDark = Color(0xF0101828)
+val AuroraGlassDeep = Color(0xD8121E30)
+val AuroraGlassBorder = Color(0x6600E5FF)
+val AuroraGlassBorderBright = Color(0xCC00E5FF)
+val AuroraText = Color(0xFFFFFFFF)
+val AuroraTextMuted = Color(0xADFFFFFF)
+val AuroraTrack = Color(0x1FFFFFFF)
 
 @Composable
 fun AuroraClockTop(
@@ -83,15 +90,28 @@ fun AuroraGlassHud(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(24.dp))
+            .clip(RoundedCornerShape(20.dp))
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(AuroraGlassDeep, AuroraGlassDark)
+                    colors = listOf(
+                        Color(0xCC121E30),
+                        Color(0xF0101828)
+                    )
                 )
             )
-            .border(1.dp, AuroraGlassBorder, RoundedCornerShape(24.dp))
-            .padding(horizontal = 22.dp, vertical = 18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
+            .border(
+                width = 1.dp,
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        AuroraGlassBorderBright.copy(alpha = 0.55f),
+                        AuroraGlassBorder.copy(alpha = 0.25f),
+                        AuroraGlassBorderBright.copy(alpha = 0.4f)
+                    )
+                ),
+                shape = RoundedCornerShape(20.dp)
+            )
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
         content = content
     )
 }
@@ -202,7 +222,9 @@ fun AuroraTransportButton(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
     hintDescription: String = contentDescription,
-    onFocusHint: ((String) -> Unit)? = null
+    onFocusHint: ((String) -> Unit)? = null,
+    buttonSize: Dp = 48.dp,
+    iconSize: Dp = 24.dp
 ) {
     val device = LocalDeviceProfile.current
     val interaction = remember { MutableInteractionSource() }
@@ -211,7 +233,7 @@ fun AuroraTransportButton(
 
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(buttonSize)
             .scale(if (focused && device.isTv) 1.1f else 1f)
             .clip(CircleShape)
             .background(if (focused) AuroraCyan.copy(alpha = 0.25f) else Color(0x22FFFFFF))
@@ -228,11 +250,49 @@ fun AuroraTransportButton(
             ),
         contentAlignment = Alignment.Center
     ) {
-        Icon(icon, contentDescription, tint = AuroraText, modifier = Modifier.size(24.dp))
+        Icon(icon, contentDescription, tint = AuroraText, modifier = Modifier.size(iconSize))
     }
 }
 
-/** Slider fino estilo mockup (no stepper 40%/100%). En TV: ← → ajusta. */
+@Composable
+private fun AuroraVolumeAdjustButton(
+    icon: ImageVector,
+    contentDescription: String,
+    onClick: () -> Unit,
+    hintDescription: String,
+    onFocusHint: ((String) -> Unit)?,
+    modifier: Modifier = Modifier,
+    size: Dp = 36.dp
+) {
+    val device = LocalDeviceProfile.current
+    val interaction = remember { MutableInteractionSource() }
+    val focused by interaction.collectIsFocusedAsState()
+    FocusHintEffect(focused = focused, description = hintDescription, onHint = onFocusHint ?: {})
+
+    Box(
+        modifier = modifier
+            .size(size)
+            .scale(if (focused && device.isTv) 1.08f else 1f)
+            .clip(CircleShape)
+            .background(if (focused) AuroraCyan.copy(alpha = 0.22f) else Color(0x28FFFFFF))
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) AuroraCyan else Color.White.copy(alpha = 0.22f),
+                shape = CircleShape
+            )
+            .safeClickable(
+                onClick = onClick,
+                showFocusBorder = false,
+                focusShape = CircleShape,
+                interactionSource = interaction
+            ),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(icon, contentDescription, tint = AuroraText, modifier = Modifier.size(18.dp))
+    }
+}
+
+/** Slider con bolita de nivel. En [compact] va en la fila de transporte; incluye botones ± enfocables. */
 @Composable
 fun AuroraGlassVolumeSlider(
     value: Float,
@@ -240,79 +300,153 @@ fun AuroraGlassVolumeSlider(
     icon: ImageVector,
     modifier: Modifier = Modifier,
     step: Float = 0.05f,
+    compact: Boolean = false,
+    inlineTrackWidth: Dp = if (compact) 88.dp else Dp.Unspecified,
+    showStepButtons: Boolean = compact,
+    decreaseHintDescription: String = "Bajar volumen",
+    increaseHintDescription: String = "Subir volumen",
     hintDescription: String = "Volumen",
     onFocusHint: ((String) -> Unit)? = null
 ) {
     val device = LocalDeviceProfile.current
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
-    FocusHintEffect(focused = focused, description = hintDescription, onHint = onFocusHint ?: {})
+    val trackNavigable = device.isTv && !showStepButtons
+    if (trackNavigable) {
+        FocusHintEffect(focused = focused, description = hintDescription, onHint = onFocusHint ?: {})
+    }
+
+    val iconSize = if (compact) 16.dp else 20.dp
+    val trackHeight = if (compact) 5.dp else if (focused && trackNavigable) 6.dp else 5.dp
+    val thumbSize = if (compact) 12.dp else 12.dp
+    val clamped = value.coerceIn(0f, 1f)
+    val decrease = { onValueChange((value - step).coerceIn(0f, 1f)) }
+    val increase = { onValueChange((value + step).coerceIn(0f, 1f)) }
 
     Row(
         modifier = modifier,
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(if (compact) 5.dp else 10.dp)
     ) {
         Icon(
             icon, contentDescription = null,
-            tint = if (focused) AuroraCyan else AuroraTextMuted,
-            modifier = Modifier.size(20.dp)
+            tint = if (trackNavigable && focused) AuroraCyanBright else AuroraTextMuted,
+            modifier = Modifier.size(iconSize)
         )
+        if (showStepButtons) {
+            AuroraVolumeAdjustButton(
+                icon = Icons.Default.Remove,
+                contentDescription = decreaseHintDescription,
+                hintDescription = decreaseHintDescription,
+                onFocusHint = onFocusHint,
+                onClick = decrease
+            )
+        }
         if (device.isTv) {
-            Box(
-                modifier = Modifier
-                    .weight(1f)
-                    .height(if (focused) 8.dp else 5.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(Color.White.copy(alpha = 0.12f))
-                    .border(
-                        width = if (focused) 1.dp else 0.dp,
-                        color = AuroraCyan.copy(alpha = 0.5f),
-                        shape = RoundedCornerShape(4.dp)
-                    )
-                    .focusable(interactionSource = interaction)
-                    .onKeyEvent { event ->
-                        if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
-                        when (event.key) {
-                            Key.DirectionLeft -> {
-                                onValueChange((value - step).coerceIn(0f, 1f)); true
-                            }
-                            Key.DirectionRight -> {
-                                onValueChange((value + step).coerceIn(0f, 1f)); true
-                            }
-                            Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar, Key.ButtonA -> {
-                                onValueChange((value + step).coerceIn(0f, 1f)); true
-                            }
-                            else -> false
-                        }
-                    }
-                    .clickable(
-                        interactionSource = interaction,
-                        indication = null,
-                        onClick = { onValueChange((value + step).coerceIn(0f, 1f)) }
-                    )
+            val trackModifier = if (compact && inlineTrackWidth != Dp.Unspecified) {
+                Modifier.width(inlineTrackWidth)
+            } else {
+                Modifier.weight(1f)
+            }
+            BoxWithConstraints(
+                modifier = trackModifier.height(thumbSize + 2.dp),
+                contentAlignment = Alignment.CenterStart
             ) {
+                val density = LocalDensity.current
+                val trackPx = with(density) { maxWidth.toPx() }
+                val thumbPx = with(density) { thumbSize.toPx() }
+                val thumbOffsetPx = ((trackPx - thumbPx).coerceAtLeast(0f)) * clamped
+                val thumbOffset = with(density) { thumbOffsetPx.toDp() }
+
+                val trackInteractionModifier = if (trackNavigable) {
+                    Modifier
+                        .focusable(interactionSource = interaction)
+                        .onKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+                            when (event.key) {
+                                Key.DirectionLeft -> { decrease(); true }
+                                Key.DirectionRight -> { increase(); true }
+                                Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar, Key.ButtonA -> {
+                                    increase(); true
+                                }
+                                else -> false
+                            }
+                        }
+                        .clickable(
+                            interactionSource = interaction,
+                            indication = null,
+                            onClick = increase
+                        )
+                } else {
+                    Modifier
+                }
+
                 Box(
                     modifier = Modifier
-                        .fillMaxHeight()
-                        .fillMaxWidth(value.coerceIn(0.02f, 1f))
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth()
+                        .height(trackHeight)
+                        .clip(RoundedCornerShape(3.dp))
+                        .background(AuroraTrack)
+                        .border(
+                            width = if (trackNavigable && focused) 1.dp else 0.dp,
+                            color = AuroraCyan.copy(alpha = 0.65f),
+                            shape = RoundedCornerShape(3.dp)
+                        )
+                        .then(trackInteractionModifier)
+                )
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth(clamped.coerceAtLeast(0.02f))
+                        .height(trackHeight)
+                        .clip(RoundedCornerShape(3.dp))
                         .background(
                             Brush.horizontalGradient(
-                                colors = listOf(AuroraCyan.copy(alpha = 0.5f), AuroraCyan)
+                                colors = listOf(AuroraCyan.copy(alpha = 0.45f), AuroraCyanBright)
                             )
+                        )
+                )
+                Box(
+                    modifier = Modifier
+                        .offset(x = thumbOffset, y = 0.dp)
+                        .size(thumbSize)
+                        .clip(CircleShape)
+                        .background(AuroraCyanBright)
+                        .border(
+                            width = if (trackNavigable && focused) 2.dp else 1.dp,
+                            color = if (trackNavigable && focused) {
+                                Color.White
+                            } else {
+                                Color.White.copy(alpha = 0.85f)
+                            },
+                            shape = CircleShape
                         )
                 )
             }
         } else {
             Slider(
-                value = value,
+                value = clamped,
                 onValueChange = onValueChange,
-                modifier = Modifier.weight(1f),
+                modifier = if (compact && inlineTrackWidth != Dp.Unspecified) {
+                    Modifier.width(inlineTrackWidth)
+                } else {
+                    Modifier.weight(1f)
+                },
                 colors = SliderDefaults.colors(
-                    thumbColor = AuroraCyan,
+                    thumbColor = AuroraCyanBright,
                     activeTrackColor = AuroraCyan,
-                    inactiveTrackColor = Color.White.copy(alpha = 0.15f)
+                    inactiveTrackColor = AuroraTrack
                 )
+            )
+        }
+        if (showStepButtons) {
+            AuroraVolumeAdjustButton(
+                icon = Icons.Default.Add,
+                contentDescription = increaseHintDescription,
+                hintDescription = increaseHintDescription,
+                onFocusHint = onFocusHint,
+                onClick = increase
             )
         }
     }
@@ -351,7 +485,7 @@ fun AuroraMusicChip(
 
 @Composable
 fun AuroraAlbumPillRow(
-    pills: List<Pair<String?, String>>,
+    pills: List<AlbumPillOption>,
     selectedId: String?,
     onSelect: (String?) -> Unit,
     modifier: Modifier = Modifier
@@ -361,22 +495,22 @@ fun AuroraAlbumPillRow(
         modifier = modifier
             .fillMaxWidth()
             .then(if (device.isTv) Modifier.focusGroup() else Modifier),
-        horizontalArrangement = Arrangement.spacedBy(10.dp)
+        horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        items(pills, key = { (id, label) -> "${id ?: "all"}::$label" }) { (id, label) ->
-            val selected = selectedId == id || (id == null && selectedId == null)
-            AuroraAlbumPill(
-                label = label,
+        items(pills, key = { pill -> "${pill.id ?: "all"}::${pill.label}" }) { pill ->
+            val selected = selectedId == pill.id || (pill.id == null && selectedId == null)
+            AuroraAlbumCard(
+                pill = pill,
                 selected = selected,
-                onClick = { onSelect(id) }
+                onClick = { onSelect(pill.id) }
             )
         }
     }
 }
 
 @Composable
-private fun AuroraAlbumPill(
-    label: String,
+private fun AuroraAlbumCard(
+    pill: AlbumPillOption,
     selected: Boolean,
     onClick: () -> Unit
 ) {
@@ -384,25 +518,29 @@ private fun AuroraAlbumPill(
     val interaction = remember { MutableInteractionSource() }
     val focused by interaction.collectIsFocusedAsState()
     val borderColor = when {
-        focused -> AuroraCyan
-        selected -> AuroraCyan.copy(alpha = 0.7f)
-        else -> Color.White.copy(alpha = 0.2f)
+        focused -> AuroraCyanBright
+        selected -> AuroraCyan
+        else -> Color.White.copy(alpha = 0.18f)
     }
     val bg = when {
-        selected -> AuroraCyan.copy(alpha = 0.18f)
-        focused -> Color.White.copy(alpha = 0.12f)
-        else -> Color.White.copy(alpha = 0.06f)
+        selected -> AuroraCyan.copy(alpha = 0.12f)
+        focused -> Color.White.copy(alpha = 0.08f)
+        else -> Color(0x18FFFFFF)
     }
+    val shortLabel = pill.label
+        .removePrefix("Fotos: ")
+        .removePrefix("Videos: ")
 
-    Box(
+    Row(
         modifier = Modifier
-            .height(38.dp)
-            .clip(RoundedCornerShape(50))
+            .widthIn(min = 120.dp, max = 188.dp)
+            .height(54.dp)
+            .clip(RoundedCornerShape(10.dp))
             .background(bg)
             .border(
                 width = if (focused || selected) 2.dp else 1.dp,
                 color = borderColor,
-                shape = RoundedCornerShape(50)
+                shape = RoundedCornerShape(10.dp)
             )
             .then(
                 if (device.isTv) {
@@ -417,16 +555,61 @@ private fun AuroraAlbumPill(
                         .clickable(interactionSource = interaction, indication = null, onClick = onClick)
                 }
             )
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center
+            .padding(6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Text(
-            text = label,
-            color = if (selected || focused) AuroraText else AuroraTextMuted,
-            fontSize = 13.sp,
-            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
-            maxLines = 1
-        )
+        Box(
+            modifier = Modifier
+                .size(42.dp)
+                .clip(RoundedCornerShape(8.dp))
+                .background(AuroraTrack)
+                .border(1.dp, Color.White.copy(alpha = 0.12f), RoundedCornerShape(8.dp))
+        ) {
+            if (pill.thumbnailUri != null) {
+                AppAsyncImage(
+                    uri = pill.thumbnailUri,
+                    contentDescription = shortLabel,
+                    modifier = Modifier.fillMaxSize(),
+                    contentScale = ContentScale.Crop,
+                    decodeWidth = 128,
+                    decodeHeight = 128,
+                    crossfadeMillis = 200
+                )
+            } else {
+                Icon(
+                    Icons.Default.Photo,
+                    contentDescription = null,
+                    tint = AuroraTextMuted,
+                    modifier = Modifier
+                        .align(Alignment.Center)
+                        .size(22.dp)
+                )
+            }
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = shortLabel,
+                color = if (selected || focused) AuroraText else AuroraTextMuted,
+                fontSize = 13.sp,
+                fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (pill.itemCount > 0) {
+                val countLabel = if (pill.label.startsWith("Videos:")) {
+                    "${pill.itemCount} vídeos"
+                } else {
+                    "${pill.itemCount} fotos"
+                }
+                Text(
+                    text = countLabel,
+                    color = AuroraTextMuted.copy(alpha = 0.85f),
+                    fontSize = 11.sp,
+                    maxLines = 1
+                )
+            }
+        }
     }
 }
 
@@ -445,7 +628,7 @@ fun AuroraProgressRow(
             progress = progress,
             modifier = Modifier
                 .weight(1f)
-                .height(4.dp)
+                .height(3.dp)
                 .clip(RoundedCornerShape(2.dp)),
             color = AuroraCyan,
             trackColor = Color.White.copy(alpha = 0.12f)

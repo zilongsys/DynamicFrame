@@ -90,7 +90,6 @@ fun DynamicFrameNavHost(
     LaunchedEffect(autoStart) {
         if (autoStart) {
             delay(800)
-            slideshowViewModel.startSlideshow(freshSession = true)
             openFullscreen()
         }
     }

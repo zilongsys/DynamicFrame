@@ -5,6 +5,7 @@ import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import com.dynamicframe.data.local.debugPreferencesDataStore
 import com.dynamicframe.data.local.slideshowSettingsDataStore
+import com.dynamicframe.data.local.weatherCacheDataStore
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,6 +21,10 @@ annotation class SlideshowSettingsDataStore
 @Qualifier
 @Retention(AnnotationRetention.BINARY)
 annotation class DebugSettingsDataStore
+
+@Qualifier
+@Retention(AnnotationRetention.BINARY)
+annotation class WeatherCacheDataStore
 
 @Module
 @InstallIn(SingletonComponent::class)
@@ -38,4 +43,11 @@ object DataStoreModule {
     fun provideDebugSettingsDataStore(
         @ApplicationContext context: Context
     ): DataStore<Preferences> = context.debugPreferencesDataStore
+
+    @Provides
+    @Singleton
+    @WeatherCacheDataStore
+    fun provideWeatherCacheDataStore(
+        @ApplicationContext context: Context
+    ): DataStore<Preferences> = context.weatherCacheDataStore
 }

@@ -1,5 +1,64 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.89
+
+### Corregido
+- **Fondo sin imagen / cuadro blanco**: requests Coil de precarga alineados con la UI (`buildSharpImageRequest`); capa de retención con `RetainedCompleteImageSlide` (no parpadea al cambiar URI); fondo+foto solo juntos en `Success`.
+
+## v0.1.88
+
+### Corregido
+- **Cuadro blanco al cambiar foto**: la capa de retención ya no recarga la nueva imagen durante la transición; `AppImage` solo pinta con Coil en `Success`; crossfade global de Coil desactivado.
+
+## v0.1.87
+
+### Corregido
+- **Flash negro sin transición**: capa `HeldSlide` mantiene la foto anterior visible hasta que la nueva está pintada; `NONE` usa swap de 1 ms en lugar de corte seco.
+- **Flash negro leve con transición**: el slide entrante ya no reserva un `Box` vacío; la capa de retención rellena los huecos del fundido.
+
+## v0.1.86
+
+### Añadido
+- **Ajustes → Slideshow**: vista previa animada de la transición seleccionada y descripción del efecto en la nota del control.
+
+## v0.1.85
+
+### Corregido
+- **«Solo fondo» al cambiar de foto**: el slide dinámico no se pinta hasta que Coil confirma la imagen nítida (`AppImageWhenReady`); fondo y foto aparecen juntos dentro de la transición `AnimatedContent`.
+- **Transición ignorada**: ya no se fuerza `TransitionType.NONE` cuando el siguiente slide es un vídeo (foto→foto respeta el estilo configurado).
+
+## v0.1.84
+
+### Corregido
+- **Fondo adelantado respecto a la foto**: fondo y foto usan la misma decodificación (960×540, caché del prefetch); bloque unificado `DynamicImageSlide`.
+- **Parpadeo / «refresh» de la imagen**: `AppAsyncImage` memoriza el request Coil; sin underlay en modo dinámico; crossfade Coil a 0 (solo anima `AnimatedContent`); paleta fijada por `item.id`.
+
+## v0.1.83
+
+### Corregido
+- **Fondo de la siguiente foto visible antes que la foto**: el letterbox dinámico va dentro del mismo `AnimatedContent` que la imagen; cambian juntos en la transición.
+- **Reproducción antes de estar listo**: «listo» incluye paleta + imagen nítida + blur; música y slideshow no arrancan hasta `awaitFirstSlideReady` (overlay «Preparando fondo…»).
+
+## v0.1.82
+
+### Corregido
+- **Fondo dinámico empeorado (regresión v0.1.81)**: eliminado el desacople `displayedSlide` que ocultaba la UI y pausaba el motor entre fotos. El motor ahora **espera** a que el backdrop esté listo **antes** de cambiar de slide (foto anterior visible, música sin cortes).
+- **Precarga inútil del blur**: `AppBlurFillImage` usaba petición Coil distinta a la precarga (sin tamaño 960×540); ahora comparten caché.
+- **Precarga bloqueada por blur**: «listo» = paleta + imagen nítida; blur en segundo plano.
+- **Música**: `setPlaybackAllowed(false)` ya no pausa ExoPlayer; `refreshPlaylist` solo si la lista cambió.
+
+### Añadido
+- `SlideshowEngine.setBeforeNavigate`: gancho suspend antes de cada cambio de diapositiva.
+
+## v0.1.81
+
+### Corregido
+- **Música que se cortaba entre slides**: eliminado `haltAllPlayback()` en cada cambio de diapositiva; `refreshPlaylist` conserva `isPlaying` al actualizar la lista de música.
+- **Imagen visible sin degradado listo**: el viewport usa `displayedSlide` (desacoplado del motor) y solo muestra la foto cuando el fondo dinámico está precargado.
+
+### Añadido
+- **`DynamicBackdropPrefetcher`**: ventana rolling de 6 slides (actual + 5 siguientes) con paleta, imagen nítida y blur; recarga al avanzar.
+
 ## v0.1.80
 
 ### Corregido
@@ -9,6 +68,7 @@
 
 ### Añadido
 - `ParadiseScreensaverControls`: nuevo param `firstButtonFocus: FocusRequester?` y `focusGroup()` en la Row del pill para habilitar navegación D-pad entre los botones.
+- **Fondo letterbox «Dinámico»** (`PlaybackBackgroundType.DYNAMIC`): degradado de colores predominantes (Palette) + misma foto/vídeo en crop con blur opaco (~78 %), igual que Paradise. Selector en Ajustes → Visual en reproducción.
 
 ## v0.1.79
 

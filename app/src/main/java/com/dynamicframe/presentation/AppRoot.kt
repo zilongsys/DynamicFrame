@@ -13,6 +13,7 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.dynamicframe.presentation.debug.DebugConsoleOverlay
 import com.dynamicframe.presentation.debug.DebugViewModel
+import com.dynamicframe.presentation.theme.ProvideAppTheme
 import com.dynamicframe.presentation.device.ProvideDeviceProfile
 import com.dynamicframe.presentation.device.TvDisplayFrame
 import com.dynamicframe.presentation.settings.SettingsViewModel
@@ -27,6 +28,7 @@ fun AppRoot(isTV: Boolean, autoStart: Boolean = false) {
 
     val uiScale = if (isTV) config.uiScale.coerceIn(0.75f, 1.25f) else 1f
 
+    ProvideAppTheme(theme = config.appTheme) {
     DynamicFrameTheme(isTv = isTV) {
         ProvideDeviceProfile(isTv = isTV) {
             TvDisplayFrame(
@@ -49,5 +51,6 @@ fun AppRoot(isTV: Boolean, autoStart: Boolean = false) {
                 }
             }
         }
+    }
     }
 }

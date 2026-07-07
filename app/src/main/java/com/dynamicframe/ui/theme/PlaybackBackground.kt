@@ -56,6 +56,19 @@ fun PlaybackLetterboxBackground(
                     Box(Modifier.fillMaxSize().background(Color.Black))
                 }
             }
+            PlaybackBackgroundType.DYNAMIC -> {
+                Box(
+                    Modifier.fillMaxSize().background(
+                        Brush.linearGradient(
+                            colors = listOf(
+                                Color(0xFF2A2840),
+                                Color(0xFF4A6080),
+                                Color(0xFF6A8AA0),
+                            ),
+                        ),
+                    ),
+                )
+            }
             else -> {
                 PlaybackBackgrounds.brushFor(type)?.let { brush ->
                     Box(Modifier.fillMaxSize().background(brush))
@@ -71,4 +84,5 @@ fun PlaybackBackgroundType.displayName(): String = when (this) {
     PlaybackBackgroundType.DEMO_SUNSET -> "Atardecer"
     PlaybackBackgroundType.DEMO_MIDNIGHT -> "Medianoche"
     PlaybackBackgroundType.CUSTOM_IMAGE -> "Mi imagen"
+    PlaybackBackgroundType.DYNAMIC -> "Dinámico (colores de la foto)"
 }

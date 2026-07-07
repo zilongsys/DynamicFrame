@@ -87,6 +87,7 @@ class DataStoreSettingsRepository @Inject constructor(
             prefs[Keys.PLAYBACK_BACKGROUND] = config.playbackBackgroundType.name
             prefs[Keys.PLAYBACK_BACKGROUND_IMAGE] = config.playbackBackgroundImageUri
             prefs[Keys.PLAYBACK_THEME] = config.playbackTheme.name
+            prefs[Keys.APP_THEME] = config.appTheme.name
         }
         syncBootPreference(config.autoStartOnBoot)
         cachedConfig = config
@@ -179,7 +180,8 @@ class DataStoreSettingsRepository @Inject constructor(
         playbackContentZoom = this[Keys.PLAYBACK_CONTENT_ZOOM] ?: 1.0f,
         playbackBackgroundType = enumOrDefault(this[Keys.PLAYBACK_BACKGROUND], PlaybackBackgroundType.DEMO_LAVENDER),
         playbackBackgroundImageUri = this[Keys.PLAYBACK_BACKGROUND_IMAGE] ?: "",
-        playbackTheme = enumOrDefault(this[Keys.PLAYBACK_THEME], PlaybackTheme.AURORA_GLASS)
+        playbackTheme = enumOrDefault(this[Keys.PLAYBACK_THEME], PlaybackTheme.AURORA_GLASS),
+        appTheme = enumOrDefault(this[Keys.APP_THEME], AppTheme.DEFAULT)
     )
     }
 

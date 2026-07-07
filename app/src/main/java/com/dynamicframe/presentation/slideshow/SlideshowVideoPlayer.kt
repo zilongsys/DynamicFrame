@@ -23,6 +23,7 @@ import androidx.media3.common.VideoSize
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
+import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
 
 @Composable
 fun SlideshowVideoPlayer(
@@ -34,6 +35,7 @@ fun SlideshowVideoPlayer(
     onVideoEnded: () -> Unit,
     onPlaybackError: () -> Unit = onVideoEnded,
     playToken: Int = 0,
+    backdropPlayer: VideoBackdropPlayerRepository? = null,
     modifier: Modifier = Modifier
 ) {
     // Referencia a la PlayerView para forzar un re-layout cuando se conoce el
@@ -56,6 +58,8 @@ fun SlideshowVideoPlayer(
     // así nunca pierde el evento STATE_ENDED por re-registros en cada recomposición.
     val currentOnEnded by rememberUpdatedState(onVideoEnded)
     val currentOnError by rememberUpdatedState(onPlaybackError)
+    val currentUri by rememberUpdatedState(uri)
+    val currentBackdrop by rememberUpdatedState(backdropPlayer)
 
     // Preparar al cambiar la URI o el playToken (este último permite reiniciar el
     // MISMO vídeo, p. ej. al hacer bucle con un único vídeo). No re-prepara al
@@ -104,9 +108,9 @@ fun SlideshowVideoPlayer(
         p.addListener(listener)
         onDispose {
             p.removeListener(listener)
-            // Detener SOLO si este slide sigue siendo el vídeo cargado: evita cortar
-            // el vídeo que ya preparó el siguiente slide en una transición vídeo→vídeo.
-            videoPlayer.stopIfCurrent(uri)
+            // Detener vídeo principal y backdrop blur en el mismo ciclo de vida.
+            videoPlayer.stopIfCurrent(currentUri)
+            currentBackdrop?.stopIfCurrent(currentUri)
         }
     }
 

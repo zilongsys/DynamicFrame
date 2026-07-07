@@ -56,6 +56,7 @@ object SlideshowPreferencesKeys {
     val PLAYBACK_BACKGROUND = stringPreferencesKey("playback_background_type")
     val PLAYBACK_BACKGROUND_IMAGE = stringPreferencesKey("playback_background_image_uri")
     val PLAYBACK_THEME = stringPreferencesKey("playback_theme")
+    val APP_THEME = stringPreferencesKey("app_theme")
 }
 
 /** Caché síncrona para `BootReceiver` (sin Hilt). Sincronizada desde DataStore al guardar config. */

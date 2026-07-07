@@ -40,6 +40,7 @@ class SlideshowEngine @Inject constructor(
     private var consecutiveErrors = 0
     /** Se incrementa en cada navegación para forzar el reinicio de un vídeo repetido. */
     private var playTokenCounter = 0
+    private var navigationJob: Job? = null
 
     init {
         scope.launch {
@@ -149,7 +150,7 @@ class SlideshowEngine @Inject constructor(
         scheduleNext()
     }
 
-    fun beginSession() {
+    fun beginSession(startPaused: Boolean = false) {
         timerJob?.cancel()
         transitionJob?.cancel()
         consecutiveErrors = 0
@@ -173,13 +174,20 @@ class SlideshowEngine @Inject constructor(
             playlistItems = shuffledItems,
             currentIndex = startIndex,
             currentItem = item,
-            isPlaying = true,
+            isPlaying = !startPaused,
             isTransitioning = false,
             playToken = ++playTokenCounter
         )
         preloadNext(startIndex)
-        scheduleNext()
-        debug.i("Slideshow", "beginSession índice=$startIndex tipo=${item.type}")
+        if (!startPaused) scheduleNext()
+        debug.i("Slideshow", "beginSession índice=$startIndex tipo=${item.type} paused=$startPaused")
+    }
+
+    /** Si devuelve suspend, se espera antes de cambiar de diapositiva (p. ej. fondo dinámico listo). */
+    private var beforeNavigate: (suspend (MediaItem) -> Unit)? = null
+
+    fun setBeforeNavigate(block: (suspend (MediaItem) -> Unit)?) {
+        beforeNavigate = block
     }
 
     fun pause() {
@@ -331,6 +339,21 @@ class SlideshowEngine @Inject constructor(
 
         val safeIndex = index.coerceIn(0, shuffledItems.lastIndex)
         val item = shuffledItems[safeIndex]
+        val hook = beforeNavigate
+        if (hook == null) {
+            applyNavigation(safeIndex, item)
+            return
+        }
+        navigationJob?.cancel()
+        navigationJob = scope.launch {
+            hook(item)
+            if (shuffledItems.isEmpty()) return@launch
+            val stillSafe = safeIndex.coerceIn(0, shuffledItems.lastIndex)
+            applyNavigation(stillSafe, shuffledItems[stillSafe])
+        }
+    }
+
+    private fun applyNavigation(safeIndex: Int, item: MediaItem) {
         val nextIdx = (safeIndex + 1) % shuffledItems.size
         debug.d("Slideshow", "navigateTo $safeIndex/${shuffledItems.lastIndex} ${item.type} ${item.name}")
 
@@ -351,6 +374,7 @@ class SlideshowEngine @Inject constructor(
             }
         }
 
+        preloadNext(safeIndex)
         if (_state.value.isPlaying) {
             scheduleNext()
         }

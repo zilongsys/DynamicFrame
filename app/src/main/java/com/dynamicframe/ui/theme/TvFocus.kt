@@ -86,6 +86,37 @@ suspend fun FocusRequester.requestFocusWhenReady() {
     runCatching { requestFocus() }
 }
 
+/** En TV Paradise: OK abre controles; otras teclas del mando muestran el hint D-pad. */
+fun Modifier.paradiseScreensaverKeys(
+    onOk: () -> Unit,
+    onOtherRemoteKey: () -> Unit,
+): Modifier = onKeyEvent { event ->
+    if (event.type != KeyEventType.KeyDown) return@onKeyEvent false
+    when (event.key) {
+        Key.DirectionCenter,
+        Key.Enter,
+        Key.NumPadEnter,
+        Key.ButtonA -> {
+            onOk()
+            true
+        }
+        Key.DirectionDown,
+        Key.DirectionUp,
+        Key.DirectionLeft,
+        Key.DirectionRight,
+        Key.Menu,
+        Key.MediaPlayPause,
+        Key.VolumeUp,
+        Key.VolumeDown,
+        Key.ChannelUp,
+        Key.ChannelDown -> {
+            onOtherRemoteKey()
+            true
+        }
+        else -> false
+    }
+}
+
 /** En TV, cualquier dirección del D-pad revela controles (estilo Netflix). */
 fun Modifier.tvRevealOnDpad(
     enabled: Boolean,

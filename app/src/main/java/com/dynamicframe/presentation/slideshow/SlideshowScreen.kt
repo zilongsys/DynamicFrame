@@ -25,6 +25,7 @@ import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onKeyEvent
 import androidx.compose.ui.input.key.type
+import com.dynamicframe.domain.model.PlaybackBackgroundType
 import com.dynamicframe.domain.model.PlaybackTheme
 import com.dynamicframe.domain.model.isParadiseActive
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
@@ -49,6 +50,11 @@ fun SlideshowScreen(
     val musicState by viewModel.musicState.collectAsStateWithLifecycle()
     val albumPills by viewModel.albumPills.collectAsStateWithLifecycle()
     val videoBlurThumbnailUri by viewModel.videoBlurThumbnailUri.collectAsStateWithLifecycle()
+    val dynamicLetterboxPalette by viewModel.dynamicLetterboxPalette.collectAsStateWithLifecycle()
+    val dynamicPalettes by viewModel.dynamicPalettes.collectAsStateWithLifecycle()
+    val presentationPhase by viewModel.presentationPhase.collectAsStateWithLifecycle()
+    val isPresenting = presentationPhase == SlideshowPresentationPhase.Presenting
+    val isPreparing = presentationPhase == SlideshowPresentationPhase.Preparing
     val weatherInfo by viewModel.weatherInfo.collectAsStateWithLifecycle()
     val paradiseControlsVisible by viewModel.controlsVisible.collectAsStateWithLifecycle()
     val selectedAlbumId by viewModel.selectedAlbumId.collectAsStateWithLifecycle()
@@ -61,9 +67,8 @@ fun SlideshowScreen(
     )
 
     DisposableEffect(Unit) {
-        viewModel.startSlideshow(freshSession = true)
+        viewModel.onSlideshowScreenVisible()
         onDispose {
-            // Al salir de pantalla completa se detiene TODO (slideshow, vídeo y música).
             viewModel.stopSlideshow()
         }
     }
@@ -298,8 +303,10 @@ fun SlideshowScreen(
     ) {
         val currentItem = slideshowState.currentItem
 
-        if (isParadise) {
-            if (currentItem != null) {
+        if (isPreparing) {
+            DynamicLetterboxLoadingOverlay(modifier = Modifier.fillMaxSize())
+        } else if (isParadise) {
+            if (currentItem != null && isPresenting) {
                 ParadiseSlideshowMediaStack(
                     currentItem = currentItem,
                     slideshowState = slideshowState,
@@ -341,12 +348,12 @@ fun SlideshowScreen(
                 slideshowState = slideshowState,
                 musicState = musicState,
                 weather = weatherInfo,
-                showDpadHint = !controlsShown && showParadiseDpadHint,
+                showDpadHint = isPresenting && !controlsShown && showParadiseDpadHint,
                 isTV = isTV
             )
 
             ParadiseThemeBadge(
-                visible = showThemeBadge,
+                visible = showThemeBadge && isPresenting,
                 modifier = Modifier
                     .align(Alignment.TopStart)
                     .padding(16.dp)
@@ -357,8 +364,7 @@ fun SlideshowScreen(
                 .fillMaxSize()
                 .focusable(enabled = false)
         ) {
-        if (currentItem != null) {
-            // El contenido de medios; el encuadre depende del tema seleccionado.
+        if (currentItem != null && isPresenting) {
             val mediaViewport: @Composable () -> Unit = {
                 SlideshowMediaViewport(
                     currentItem = currentItem,
@@ -377,6 +383,14 @@ fun SlideshowScreen(
                     onPreloadImages = viewModel::preloadImages,
                     backgroundType = config.playbackBackgroundType,
                     backgroundImageUri = config.playbackBackgroundImageUri,
+                    dynamicPalette = dynamicLetterboxPalette,
+                    dynamicPalettes = dynamicPalettes,
+                    videoBackdropPlayer = if (config.playbackBackgroundType == PlaybackBackgroundType.DYNAMIC) {
+                        viewModel.videoBackdropPlayer
+                    } else {
+                        null
+                    },
+                    videoBlurThumbnailUri = videoBlurThumbnailUri,
                     modifier = Modifier.fillMaxSize()
                 )
             }
@@ -402,7 +416,7 @@ fun SlideshowScreen(
                     }
                 }
             }
-        } else {
+        } else if (!isPreparing) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -531,7 +545,7 @@ fun SlideshowScreen(
                     firstButtonFocus = if (isTV) paradiseFocus else null,
                 )
             }
-        } else if (themeAlwaysVisible || showControls) {
+        } else if (isPresenting && (themeAlwaysVisible || showControls)) {
             val overlayConfig = config
             PlaybackControlsOverlay(
                 slideshowState = slideshowState,

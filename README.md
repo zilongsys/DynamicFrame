@@ -123,9 +123,8 @@ Para seleccionar el flavor en Android Studio:
 
 ## 🗺️ Roadmap
 
-Las sugerencias de producto, diferenciación vs galería y deuda técnica están archivadas en:
-
-**[`docs/ROADMAP.md`](docs/ROADMAP.md)**
+- **[`docs/PRODUCT_ROADMAP.md`](docs/PRODUCT_ROADMAP.md)** — análisis completo, brechas, comparativa Nixplay, orden de implementación
+- **[`docs/ROADMAP.md`](docs/ROADMAP.md)** — índice corto con próximos pasos
 
 Guía para probar en Google TV / emulador TV:
 

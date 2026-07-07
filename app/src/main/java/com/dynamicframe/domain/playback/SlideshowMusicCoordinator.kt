@@ -16,6 +16,14 @@ class SlideshowMusicCoordinator @Inject constructor(
 ) {
     val state get() = music.state
 
+    @Volatile
+    private var playbackAllowed = false
+
+    /** Cuando es false, ninguna ruta puede iniciar o reanudar audio (p. ej. durante precarga). */
+    fun setPlaybackAllowed(allowed: Boolean) {
+        playbackAllowed = allowed
+    }
+
     /** Si el aleatorio está activo, baraja la lista ANTES de reproducir y se reproduce en ese orden. */
     private fun ordered(tracks: List<MusicTrack>, shuffle: Boolean): List<MusicTrack> =
         if (shuffle) tracks.shuffled() else tracks
@@ -25,6 +33,7 @@ class SlideshowMusicCoordinator @Inject constructor(
         a.map { it.id }.toSet() == b.map { it.id }.toSet()
 
     suspend fun startForSession(freshSession: Boolean) {
+        if (!playbackAllowed) return
         runCatching {
             val config = getConfig()
             val tracks = getMusicTracks().getOrDefault(emptyList())
@@ -44,6 +53,7 @@ class SlideshowMusicCoordinator @Inject constructor(
     }
 
     suspend fun resumePlayback() {
+        if (!playbackAllowed) return
         runCatching {
             val config = getConfig()
             val tracks = getMusicTracks().getOrDefault(emptyList())
@@ -83,6 +93,7 @@ class SlideshowMusicCoordinator @Inject constructor(
             }
 
             music.ensureConnected()
+            if (!playbackAllowed) return@runCatching
             music.setPlaylist(ordered(tracks, config.musicShuffle), autoPlay = playAfter)
             music.setVolume(config.musicVolume)
             music.setShuffle(config.musicShuffle)
@@ -91,7 +102,10 @@ class SlideshowMusicCoordinator @Inject constructor(
 
     fun pause() = music.pause()
 
-    fun play() = music.play()
+    fun play() {
+        if (!playbackAllowed) return
+        music.play()
+    }
 
     fun setVolume(volume: Float) = music.setVolume(volume)
 

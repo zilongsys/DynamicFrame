@@ -1,6 +1,6 @@
-# DynamicFrame — Roadmap y sugerencias archivadas
+# DynamicFrame — Roadmap (índice)
 
-Documento de referencia para implementaciones futuras. Orden sugerido por impacto vs esfuerzo.
+> **Documento completo:** [`docs/PRODUCT_ROADMAP.md`](PRODUCT_ROADMAP.md) — análisis de madurez, brechas, comparativa Nixplay y orden de implementación.
 
 ---
 
@@ -10,86 +10,52 @@ Documento de referencia para implementaciones futuras. Orden sugerido por impact
 |----------|-----------|
 | Galería del sistema | Ver y compartir fotos bajo demanda |
 | **DynamicFrame** | Pantalla siempre viva: marco digital + música + ambiente |
+| **Nixplay** | Marco hardware + nube + app familiar (ver comparativa en PRODUCT_ROADMAP) |
 
-**Gancho principal:** música de fondo sincronizada, slideshow continuo, reloj, carpetas SAF, modo TV inmersivo y autostart — cosas que la galería no ofrece.
+**Gancho DynamicFrame:** música de fondo, ambientes Paradise/Aurora, slideshow local sin suscripción, TV que ya tienes.
 
 ---
 
-## Tier 1 — Imprescindible (competir con marcos comerciales)
+## Próximos pasos (orden recomendado)
 
-- [ ] **Modo marco 24/7** — Wake lock suave, atenuación nocturna, anti burn-in (movimiento sutil, rotación del reloj).
-- [ ] **Entrada directa al slideshow** — Opción “al abrir → fullscreen” y “al boot → slideshow” (no solo MainActivity).
-- [ ] **Perfiles por hora** — Mañana / tarde / noche: playlist, transiciones y brillo automáticos.
-- [ ] **Pairing móvil → TV** — Enviar fotos al marco (QR + WebSocket o Firebase).
-- [ ] **Widgets / clima / calendario** — Overlay opcional: temperatura, eventos, cumpleaños.
+1. [ ] Honestidad UI — ocultar Spotify/YouTube/temas sin backend
+2. [ ] Fullscreen al abrir + modo regalo
+3. [ ] Modo 24/7 — noche, burn-in global
+4. [ ] Pairing móvil → TV (MVP LAN)
+5. [ ] Perfiles horarios
+6. [ ] Backup config JSON
+7. [ ] Google Photos **o** SMB NAS
+8. [ ] App companion (control remoto)
+9. [ ] Onboarding + PIN
+10. [ ] Tests + Play Store
+
+---
+
+## Tier 1 — Imprescindible
+
+Ver checklist completo en [PRODUCT_ROADMAP.md § Tier A](PRODUCT_ROADMAP.md#tier-a--imprescindible-para-producto-vendible--regalable).
 
 ---
 
 ## Tier 2 — Diferenciación
 
-- [ ] **Playlists por mood** — Álbum de fotos ↔ playlist (vacaciones, bebé, etc.).
-- [ ] **Detección de presencia** — Pausa si no hay nadie (cámara o sensor).
-- [ ] **Google Photos / Drive** — Sincronización en la nube.
-- [ ] **Captions / historia** — Texto bajo la foto (EXIF o edición manual).
-- [ ] **Transición inteligente** — Ken Burns en horizontales, slide en verticales, random ponderado.
+Ver [PRODUCT_ROADMAP.md § Tier B](PRODUCT_ROADMAP.md#tier-b--diferenciación).
 
 ---
 
-## Tier 3 — Pulido premium
+## Tier 3 — Premium
 
-- [ ] **App control remoto** — Segunda app o PWA para cambiar álbum, pausar, subir fotos.
-- [ ] **Estadísticas** — “Esta foto se mostró X horas este mes”.
-- [ ] **Modo regalo** — Preconfiguración simple para familiares (una carpeta, una playlist, sin menús).
-- [ ] **Temas visuales del marco** — Bordes, sombras, estilo museo.
-- [ ] **Backup de config** — Export/import JSON de ajustes.
+Ver [PRODUCT_ROADMAP.md § Tier C](PRODUCT_ROADMAP.md#tier-c--premium--escala).
 
 ---
 
-## Fuentes remotas (Fase 2 del README original)
+## Deuda técnica
 
-- [ ] Google Photos API
-- [ ] OneDrive (Microsoft Graph)
-- [ ] SMB / DLNA / NAS
-
----
-
-## Música avanzada
-
-- [ ] Spotify Android SDK (Premium) + selección de playlist
-- [ ] YouTube Music / streaming (evaluar legalidad y API)
-- [ ] Temas de ambiente embebidos (THEME hoy es placeholder)
-- [ ] Quitar o marcar claramente opciones no implementadas (Spotify/YouTube en UI)
+- [ ] Unificar selección de álbumes (Ajustes vs Home)
+- [ ] `screenSaverMode` sin lógica
+- [ ] Limpiar Room / Retrofit / WorkManager
+- [ ] README alineado con v0.1.80+
 
 ---
 
-## Deuda técnica conocida (corregir cuando toque)
-
-- [ ] Unificar selección de álbumes (multi en Ajustes vs uno en Home)
-- [ ] `MediaPermissions.pendingAction` estático — race con dos permisos
-- [ ] Limpiar deps sin uso: Room, Retrofit, WorkManager
-- [ ] `screenSaverMode` en config sin lógica
-- [ ] `MediaSource.GOOGLE_PHOTOS`, `ONEDRIVE`, `NETWORK_SHARE` sin implementar
-
----
-
-## Bugs ya corregidos (referencia)
-
-- ViewModel destruía singletons al salir de fullscreen
-- Playlist de música perdida si ExoPlayer no estaba conectado
-- `loop` ignorado en el engine
-- Intervalo no se re-programaba al cambiar segundos
-- Shuffle reseteaba la foto actual
-- Doble shuffle en use case + ExoPlayer
-- Ducking con config desactualizada
-- `MusicPlaybackService` exported=true
-- Pausar solo paraba fotos (no música/vídeo)
-
----
-
-## Mensaje de marketing (borrador)
-
-*“Tu TV o tablet como marco digital con música — sin suscripción, tus archivos, tu control.”*
-
----
-
-*Última actualización: mayo 2026*
+*Última actualización: junio 2026*

@@ -74,7 +74,7 @@ fun PlaybackControlsOverlay(
     slideshowState: SlideshowState,
     config: SlideshowConfig,
     musicState: MusicPlayerState,
-    pills: List<Pair<String?, String>>,
+    pills: List<AlbumPillOption>,
     selectedAlbumId: String?,
     isTV: Boolean,
     controlHint: String,
@@ -88,7 +88,7 @@ fun PlaybackControlsOverlay(
             AmbientControls(slideshowState, isTV, pauseFocus, bottomBarFocus, cb)
         PlaybackTheme.GALLERY ->
             GalleryControls(slideshowState, config, musicState, isTV, pauseFocus, cb)
-        else ->
+        PlaybackTheme.PARADISE, PlaybackTheme.AURORA_GLASS ->
             AuroraGlassControls(
                 slideshowState, config, musicState, pills, selectedAlbumId,
                 isTV, controlHint, pauseFocus, bottomBarFocus, cb
@@ -103,7 +103,7 @@ private fun AuroraGlassControls(
     slideshowState: SlideshowState,
     config: SlideshowConfig,
     musicState: MusicPlayerState,
-    pills: List<Pair<String?, String>>,
+    pills: List<AlbumPillOption>,
     selectedAlbumId: String?,
     isTV: Boolean,
     controlHint: String,
@@ -159,26 +159,37 @@ private fun AuroraGlassControls(
             }
         }
 
-        AuroraCenterPlayButton(
-            isPlaying = slideshowState.isPlaying,
-            onClick = cb.onPlayPause,
-            modifier = pauseDpadModifier(isTV, pauseFocus, bottomBarFocus).align(Alignment.Center),
-            onFocusChanged = cb.onPauseFocusChanged,
-            hintDescription = if (slideshowState.isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
-            onFocusHint = cb.setControlHint
-        )
-
         if (config.playbackShowOverlay) {
-            AuroraGlassHud(
+            Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(horizontal = 20.dp, vertical = 18.dp)
+                    .fillMaxWidth()
             ) {
+                // Play/pausa centrado justo encima del HUD (mockup).
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(bottom = 4.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    AuroraCenterPlayButton(
+                        isPlaying = slideshowState.isPlaying,
+                        onClick = cb.onPlayPause,
+                        modifier = pauseDpadModifier(isTV, pauseFocus, bottomBarFocus),
+                        onFocusChanged = cb.onPauseFocusChanged,
+                        hintDescription = if (slideshowState.isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
+                        onFocusHint = cb.setControlHint
+                    )
+                }
+
+                AuroraGlassHud(
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp)
+                ) {
                 if (pills.size > 1) {
                     Text(
                         text = "Álbumes",
                         color = AuroraTextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Medium,
                         letterSpacing = 0.5.sp
                     )
@@ -198,17 +209,22 @@ private fun AuroraGlassControls(
                     )
                 }
 
+                val showVideoVolume = !config.muteVideoAudio
+                val transportSize = 42.dp
+                val transportIcon = 22.dp
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(5.dp)
                 ) {
                     AuroraTransportButton(
                         icon = Icons.Default.Replay,
                         contentDescription = "Reiniciar",
                         hintDescription = "Reiniciar desde el principio",
                         onFocusHint = cb.setControlHint,
-                        onClick = cb.onRestart
+                        onClick = cb.onRestart,
+                        buttonSize = transportSize,
+                        iconSize = transportIcon
                     )
                     AuroraTransportButton(
                         icon = Icons.Default.SkipPrevious,
@@ -216,48 +232,59 @@ private fun AuroraGlassControls(
                         hintDescription = "Foto o vídeo anterior",
                         onFocusHint = cb.setControlHint,
                         modifier = if (isTV) Modifier.focusRequester(bottomBarFocus) else Modifier,
-                        onClick = cb.onPrevious
+                        onClick = cb.onPrevious,
+                        buttonSize = transportSize,
+                        iconSize = transportIcon
                     )
                     AuroraTransportButton(
                         icon = Icons.Default.SkipNext,
                         contentDescription = "Siguiente",
                         hintDescription = "Foto o vídeo siguiente",
                         onFocusHint = cb.setControlHint,
-                        onClick = cb.onNext
+                        onClick = cb.onNext,
+                        buttonSize = transportSize,
+                        iconSize = transportIcon
                     )
                     AuroraGlassVolumeSlider(
                         value = config.musicVolume,
                         onValueChange = cb.onMusicVolume,
-                        icon = Icons.Default.VolumeUp,
-                        hintDescription = "Volumen música · ← → ajustar",
+                        icon = Icons.Default.MusicNote,
+                        decreaseHintDescription = "Bajar volumen de la música",
+                        increaseHintDescription = "Subir volumen de la música",
                         onFocusHint = cb.setControlHint,
-                        modifier = Modifier.weight(1f).padding(horizontal = 4.dp)
+                        compact = true,
+                        inlineTrackWidth = 92.dp
                     )
+                    if (showVideoVolume) {
+                        AuroraGlassVolumeSlider(
+                            value = config.mediaVolume,
+                            onValueChange = cb.onMediaVolume,
+                            icon = Icons.Default.Movie,
+                            decreaseHintDescription = "Bajar volumen del vídeo",
+                            increaseHintDescription = "Subir volumen del vídeo",
+                            onFocusHint = cb.setControlHint,
+                            compact = true,
+                            inlineTrackWidth = 92.dp
+                        )
+                    }
+                    Spacer(modifier = Modifier.weight(1f))
                     AuroraTransportButton(
                         icon = if (musicState.isPlaying) Icons.Default.MusicNote else Icons.Default.MusicOff,
                         contentDescription = "Música",
                         hintDescription = if (musicState.isPlaying) "Pausar música" else "Reanudar música",
                         onFocusHint = cb.setControlHint,
-                        onClick = cb.onToggleMusic
+                        onClick = cb.onToggleMusic,
+                        buttonSize = transportSize,
+                        iconSize = transportIcon
                     )
                     AuroraTransportButton(
                         icon = Icons.Default.FastForward,
                         contentDescription = "Siguiente canción",
                         hintDescription = "Saltar a la siguiente pista",
                         onFocusHint = cb.setControlHint,
-                        onClick = cb.onSkipTrack
-                    )
-                }
-
-                val currentForVol = slideshowState.currentItem
-                if (currentForVol?.type == MediaType.VIDEO && !config.muteVideoAudio) {
-                    AuroraGlassVolumeSlider(
-                        value = config.mediaVolume,
-                        onValueChange = cb.onMediaVolume,
-                        icon = Icons.Default.Movie,
-                        hintDescription = "Volumen vídeo · ← → ajustar",
-                        onFocusHint = cb.setControlHint,
-                        modifier = Modifier.fillMaxWidth()
+                        onClick = cb.onSkipTrack,
+                        buttonSize = transportSize,
+                        iconSize = transportIcon
                     )
                 }
 
@@ -271,6 +298,24 @@ private fun AuroraGlassControls(
                         maxLines = 2
                     )
                 }
+                }
+            }
+        } else {
+            // Sin HUD: play centrado en la parte inferior (solo pausa/reanudar).
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 48.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                AuroraCenterPlayButton(
+                    isPlaying = slideshowState.isPlaying,
+                    onClick = cb.onPlayPause,
+                    modifier = pauseDpadModifier(isTV, pauseFocus, bottomBarFocus),
+                    onFocusChanged = cb.onPauseFocusChanged,
+                    hintDescription = if (slideshowState.isPlaying) "Pausar fotos y música" else "Reanudar reproducción",
+                    onFocusHint = cb.setControlHint
+                )
             }
         }
     }
