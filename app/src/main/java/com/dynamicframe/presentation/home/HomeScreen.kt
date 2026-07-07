@@ -59,6 +59,7 @@ import com.dynamicframe.presentation.device.LocalDeviceProfile
 import com.dynamicframe.presentation.device.navLabel
 import com.dynamicframe.presentation.slideshow.AlbumPillOption
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
+import com.dynamicframe.presentation.common.DeleteMediaFailureDialog
 import com.dynamicframe.presentation.slideshow.SlideshowViewModel
 import com.dynamicframe.ui.components.AppAsyncImage
 import com.dynamicframe.ui.theme.NostalgiaAccent
@@ -106,6 +107,7 @@ fun HomeScreen(
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pendingDeleteItem by remember { mutableStateOf<com.dynamicframe.domain.model.MediaItem?>(null) }
+    val deleteFailure by slideshowViewModel.deleteFailure.collectAsStateWithLifecycle()
     val deleteConsentIntentSender by slideshowViewModel.deleteConsentIntentSender.collectAsStateWithLifecycle()
 
     val deleteConsentLauncher = rememberLauncherForActivityResult(
@@ -134,6 +136,12 @@ fun HomeScreen(
             slideshowViewModel.clearToast()
         }
     }
+
+    DeleteMediaFailureDialog(
+        failure = deleteFailure,
+        onDismiss = { slideshowViewModel.clearDeleteFailure() },
+        onOpenContentSettings = { destination = MemoriaDestination.Settings },
+    )
 
     ConfirmDeleteDialog(
         visible = showDeleteConfirm,

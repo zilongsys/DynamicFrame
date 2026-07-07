@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Diagnóstico de error al borrar en slideshow
+- Estado: Completado
+- Descripción: DeleteMediaFailure con causa, solución y acciones; diálogo en UI; detección en LocalMediaRepository.
+
 ## 2026-06-22 — Fix KSP imports borrado slideshow
 - Estado: Completado
 - Descripción: Restaurar imports LocalStorageBrowserRepository y DeleteConsentAccessor en RepositoryModule/UseCases.

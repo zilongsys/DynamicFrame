@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.92
+
+### Actualizado
+- **Borrar en slideshow**: si falla, la app detecta la causa (permisos, carpeta solo lectura, bloqueo del sistema…) y muestra un diálogo con explicación y acción sugerida (Ajustes → Contenido o abrir con otra app).
+
 ## v0.1.91
 
 ### Corregido

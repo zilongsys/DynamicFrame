@@ -4,6 +4,7 @@ import android.content.IntentSender
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dynamicframe.domain.model.DeleteMediaFailure
 import com.dynamicframe.domain.model.DeleteMediaResult
 import com.dynamicframe.domain.model.MediaDynamicPalette
 import com.dynamicframe.domain.model.MediaAlbum
@@ -72,6 +73,9 @@ class SlideshowViewModel @Inject constructor(
 ) : ViewModel() {
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+    private val _deleteFailure = MutableStateFlow<DeleteMediaFailure?>(null)
+    val deleteFailure: StateFlow<DeleteMediaFailure?> = _deleteFailure.asStateFlow()
 
     private val _deleteConsentIntentSender = MutableStateFlow<IntentSender?>(null)
     val deleteConsentIntentSender: StateFlow<IntentSender?> = _deleteConsentIntentSender.asStateFlow()
@@ -444,9 +448,14 @@ class SlideshowViewModel @Inject constructor(
     }
 
     /** Pausa slideshow, vídeo y música al abrir el diálogo de borrado. */
-    fun prepareDelete(item: MediaItem) {
+    fun prepareDelete(item: MediaItem): Boolean {
+        if (item.source != MediaSource.LOCAL) {
+            _deleteFailure.value = DeleteMediaFailure.notLocalSource()
+            return false
+        }
         deleteContext = DeleteContext(item, slideshowState.value.isPlaying)
         pauseForDelete()
+        return true
     }
 
     fun cancelDelete() {
@@ -461,6 +470,10 @@ class SlideshowViewModel @Inject constructor(
         performDelete(ctx.item, ctx.resumeAfter)
     }
 
+    fun clearDeleteFailure() {
+        _deleteFailure.value = null
+    }
+
     fun clearDeleteConsentIntent() {
         _deleteConsentIntentSender.value = null
     }
@@ -472,6 +485,7 @@ class SlideshowViewModel @Inject constructor(
         if (!granted || ctx == null) {
             if (ctx?.resumeAfter == true) resumeAfterDelete()
             if (!granted && ctx != null) {
+                if (ctx.resumeAfter) resumeAfterDelete()
                 _toastMessage.value = "Borrado cancelado"
             }
             return
@@ -502,10 +516,10 @@ class SlideshowViewModel @Inject constructor(
                     if (sender != null) {
                         _deleteConsentIntentSender.value = sender
                     } else {
-                        onDeleteFailed("No se pudo solicitar permiso para borrar", resumeAfter)
+                        onDeleteFailed(DeleteMediaFailure.consentRequestFailed(), resumeAfter)
                     }
                 }
-                is DeleteMediaResult.Failed -> onDeleteFailed(result.message, resumeAfter)
+                is DeleteMediaResult.Failed -> onDeleteFailed(result.failure, resumeAfter)
             }
         }
     }
@@ -522,8 +536,8 @@ class SlideshowViewModel @Inject constructor(
         }
     }
 
-    private fun onDeleteFailed(message: String, resumeAfter: Boolean) {
-        _toastMessage.value = message
+    private fun onDeleteFailed(failure: DeleteMediaFailure, resumeAfter: Boolean) {
+        _deleteFailure.value = failure
         if (resumeAfter) resumeAfterDelete()
     }
 

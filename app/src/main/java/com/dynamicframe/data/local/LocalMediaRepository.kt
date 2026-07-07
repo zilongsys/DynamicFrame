@@ -9,6 +9,7 @@ import android.os.Build
 import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
+import com.dynamicframe.domain.model.DeleteMediaFailure
 import com.dynamicframe.domain.model.DeleteMediaResult
 import com.dynamicframe.domain.model.MediaContentFilter
 import com.dynamicframe.domain.model.*
@@ -307,47 +308,68 @@ class LocalMediaRepository @Inject constructor(
     }.flowOn(Dispatchers.IO)
 
     override suspend fun deleteMediaItem(item: MediaItem): DeleteMediaResult = withContext(Dispatchers.IO) {
-        runCatching { deleteItemInternal(item) }
-            .fold(
-                onSuccess = { it },
-                onFailure = { e ->
-                    DeleteMediaResult.Failed(e.message ?: "No se pudo borrar el archivo")
-                },
-            )
+        if (item.source != MediaSource.LOCAL) {
+            return@withContext DeleteMediaResult.Failed(MediaDeleteFailureMapper.notLocalSource())
+        }
+        deleteItemInternal(item)
     }
 
     private sealed interface InternalDeleteOutcome {
         data object Deleted : InternalDeleteOutcome
         data class NeedsConsent(val intentSender: android.content.IntentSender) : InternalDeleteOutcome
+        data class Failed(val failure: DeleteMediaFailure) : InternalDeleteOutcome
     }
 
     private fun deleteItemInternal(item: MediaItem): DeleteMediaResult {
         val parsed = Uri.parse(item.uri)
         return when (parsed.scheme) {
-            "file" -> {
-                val path = parsed.path ?: throw IOException("Ruta inválida")
-                val file = File(path)
-                when {
-                    !file.exists() -> DeleteMediaResult.Deleted
-                    file.delete() -> DeleteMediaResult.Deleted
-                    else -> throw IOException("No se pudo borrar el archivo")
-                }
-            }
-            "content" -> when (val outcome = deleteContentUri(parsed)) {
+            "file" -> deleteFileUri(parsed, item.uri)
+            "content" -> when (val outcome = deleteContentUri(parsed, item.uri)) {
                 InternalDeleteOutcome.Deleted -> DeleteMediaResult.Deleted
                 is InternalDeleteOutcome.NeedsConsent -> DeleteMediaResult.NeedsUserConsent(
                     deleteConsentStore.register(outcome.intentSender),
                 )
+                is InternalDeleteOutcome.Failed -> DeleteMediaResult.Failed(outcome.failure)
             }
-            else -> throw IOException("Tipo de archivo no soportado para borrar")
+            else -> DeleteMediaResult.Failed(
+                MediaDeleteFailureMapper.unsupportedUri().copy(mediaUri = item.uri),
+            )
         }
     }
 
-    private fun deleteContentUri(uri: Uri): InternalDeleteOutcome {
+    private fun deleteFileUri(uri: Uri, rawUri: String): DeleteMediaResult {
+        val path = uri.path ?: return DeleteMediaResult.Failed(
+            MediaDeleteFailureMapper.unsupportedUri().copy(mediaUri = rawUri),
+        )
+        val file = File(path)
+        if (!file.exists()) return DeleteMediaResult.Deleted
+
+        val parent = file.parentFile
+        if (parent != null && !parent.canWrite()) {
+            return DeleteMediaResult.Failed(MediaDeleteFailureMapper.readOnlyStorage(rawUri))
+        }
+        if (!file.canWrite()) {
+            return DeleteMediaResult.Failed(MediaDeleteFailureMapper.fileNotWritable(rawUri))
+        }
+        return if (file.delete()) {
+            DeleteMediaResult.Deleted
+        } else {
+            DeleteMediaResult.Failed(MediaDeleteFailureMapper.fileInUse(rawUri))
+        }
+    }
+
+    private fun deleteContentUri(uri: Uri, rawUri: String): InternalDeleteOutcome {
         if (DocumentsContract.isDocumentUri(context, uri)) {
             val doc = DocumentFile.fromSingleUri(context, uri)
-            if (doc != null && doc.exists() && doc.delete()) {
-                return InternalDeleteOutcome.Deleted
+            when {
+                doc == null || !doc.exists() -> return InternalDeleteOutcome.Deleted
+                !doc.canWrite() -> return InternalDeleteOutcome.Failed(
+                    MediaDeleteFailureMapper.safNoWriteAccess(rawUri),
+                )
+                doc.delete() -> return InternalDeleteOutcome.Deleted
+                else -> return InternalDeleteOutcome.Failed(
+                    MediaDeleteFailureMapper.fileInUse(rawUri),
+                )
             }
         }
 
@@ -357,18 +379,49 @@ class LocalMediaRepository @Inject constructor(
         } catch (e: android.app.RecoverableSecurityException) {
             return InternalDeleteOutcome.NeedsConsent(e.userAction.actionIntent.intentSender)
         } catch (_: SecurityException) {
-            // Intentar otras vías abajo.
+            // Probar otras vías.
         }
 
-        DocumentFile.fromSingleUri(context, uri)?.takeIf { it.exists() && it.delete() }?.let {
-            return InternalDeleteOutcome.Deleted
+        val doc = DocumentFile.fromSingleUri(context, uri)
+        if (doc != null && doc.exists()) {
+            when {
+                !doc.canWrite() -> return InternalDeleteOutcome.Failed(
+                    MediaDeleteFailureMapper.safNoWriteAccess(rawUri),
+                )
+                doc.delete() -> return InternalDeleteOutcome.Deleted
+            }
         }
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            val pending = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
-            return InternalDeleteOutcome.NeedsConsent(pending.intentSender)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R && uriExists(uri)) {
+            return try {
+                val pending = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
+                InternalDeleteOutcome.NeedsConsent(pending.intentSender)
+            } catch (_: Exception) {
+                InternalDeleteOutcome.Failed(MediaDeleteFailureMapper.systemDeleteBlocked(rawUri))
+            }
         }
 
-        throw IOException("No se pudo borrar. Puede requerir permiso del sistema.")
+        return when {
+            !uriExists(uri) -> InternalDeleteOutcome.Deleted
+            isMediaStoreUri(uri) -> InternalDeleteOutcome.Failed(
+                MediaDeleteFailureMapper.systemDeleteBlocked(rawUri),
+            )
+            else -> InternalDeleteOutcome.Failed(
+                MediaDeleteFailureMapper.permissionDenied(rawUri),
+            )
+        }
+    }
+
+    private fun uriExists(uri: Uri): Boolean =
+        runCatching {
+            contentResolver.query(uri, arrayOf(MediaStore.MediaColumns._ID), null, null, null)
+                ?.use { it.moveToFirst() } == true
+        }.getOrDefault(false)
+
+    private fun isMediaStoreUri(uri: Uri): Boolean {
+        val authority = uri.authority ?: return false
+        return authority == MediaStore.AUTHORITY ||
+            authority.endsWith(".media") ||
+            authority.contains("media")
     }
 }

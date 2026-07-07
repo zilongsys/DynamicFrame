@@ -33,6 +33,7 @@ import com.dynamicframe.domain.model.PlaybackBackgroundType
 import com.dynamicframe.domain.model.PlaybackTheme
 import com.dynamicframe.domain.model.isParadiseActive
 import com.dynamicframe.presentation.common.ConfirmDeleteDialog
+import com.dynamicframe.presentation.common.DeleteMediaFailureDialog
 import com.dynamicframe.presentation.permissions.MediaPermissionDeniedBanner
 import com.dynamicframe.ui.theme.*
 import com.dynamicframe.ui.theme.requestFocusWhenReady
@@ -66,6 +67,7 @@ fun SlideshowScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
     var pendingDeleteItem by remember { mutableStateOf<com.dynamicframe.domain.model.MediaItem?>(null) }
+    val deleteFailure by viewModel.deleteFailure.collectAsStateWithLifecycle()
     val deleteConsentIntentSender by viewModel.deleteConsentIntentSender.collectAsStateWithLifecycle()
 
     val deleteConsentLauncher = rememberLauncherForActivityResult(
@@ -96,6 +98,12 @@ fun SlideshowScreen(
             viewModel.clearToast()
         }
     }
+
+    DeleteMediaFailureDialog(
+        failure = deleteFailure,
+        onDismiss = { viewModel.clearDeleteFailure() },
+        onOpenContentSettings = onOpenSettings,
+    )
 
     ConfirmDeleteDialog(
         visible = showDeleteConfirm,
@@ -254,8 +262,9 @@ fun SlideshowScreen(
                 touch()
                 val item = slideshowState.currentItem ?: return@PlaybackControlsCallbacks
                 pendingDeleteItem = item
-                viewModel.prepareDelete(item)
-                showDeleteConfirm = true
+                if (viewModel.prepareDelete(item)) {
+                    showDeleteConfirm = true
+                }
             },
             onOpenSettings = { touch(); onOpenSettings() },
             onPlayPause = {
