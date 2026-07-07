@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Borrar en slideshow (miniatura, pausa, borrado real)
+- Estado: Completado
+- Descripción: Captura ítem al pulsar borrar; diálogo con miniatura; pausa total; MediaStore/SAF + consentimiento sistema; reanuda tras borrar.
+
 ## 2026-06-22 — Fix fondo solo + cuadro blanco (CompleteImageSlide)
 - Estado: Completado
 - Descripción: Caché Coil alineada precarga/UI; RetainedCompleteImageSlide en capa held; fondo+foto juntos en Success.

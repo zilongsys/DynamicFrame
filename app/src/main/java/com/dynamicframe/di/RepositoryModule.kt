@@ -5,7 +5,8 @@ import com.dynamicframe.data.local.CoilImageCacheRepository
 import com.dynamicframe.data.local.DataStoreSettingsRepository
 import com.dynamicframe.data.local.LocalMediaRepository
 import com.dynamicframe.data.local.LocalMusicRepository
-import com.dynamicframe.data.local.LocalStorageBrowserRepository
+import com.dynamicframe.data.local.DeleteConsentAccessorImpl
+import com.dynamicframe.domain.repository.DeleteConsentAccessor
 import com.dynamicframe.data.local.MediaMetadataVideoThumbnailRepository
 import com.dynamicframe.data.local.OpenMeteoWeatherRepository
 import com.dynamicframe.domain.repository.StorageBrowserRepository
@@ -59,4 +60,8 @@ abstract class RepositoryModule {
     @Binds
     @Singleton
     abstract fun bindMediaPaletteRepository(impl: AndroidMediaPaletteRepository): MediaPaletteRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindDeleteConsentAccessor(impl: DeleteConsentAccessorImpl): DeleteConsentAccessor
 }

@@ -105,6 +105,23 @@ fun HomeScreen(
     val albums by settingsViewModel.albums.collectAsStateWithLifecycle()
 
     var showDeleteConfirm by remember { mutableStateOf(false) }
+    var pendingDeleteItem by remember { mutableStateOf<com.dynamicframe.domain.model.MediaItem?>(null) }
+    val deleteConsentIntentSender by slideshowViewModel.deleteConsentIntentSender.collectAsStateWithLifecycle()
+
+    val deleteConsentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        slideshowViewModel.onDeleteConsentResult(result.resultCode == android.app.Activity.RESULT_OK)
+    }
+
+    LaunchedEffect(deleteConsentIntentSender) {
+        val sender = deleteConsentIntentSender ?: return@LaunchedEffect
+        deleteConsentLauncher.launch(
+            androidx.activity.result.IntentSenderRequest.Builder(sender).build(),
+        )
+        slideshowViewModel.clearDeleteConsentIntent()
+    }
+
     val toastMessage by slideshowViewModel.toastMessage.collectAsStateWithLifecycle()
 
     val localPermissions = rememberMediaPermissions()
@@ -122,8 +139,19 @@ fun HomeScreen(
         visible = showDeleteConfirm,
         title = "¿Borrar esta foto o vídeo?",
         message = "Se eliminará del dispositivo. Esta acción no se puede deshacer.",
-        onConfirm = { slideshowViewModel.deleteCurrentSlide() },
-        onDismiss = { showDeleteConfirm = false }
+        thumbnailUri = pendingDeleteItem?.thumbnailUri ?: pendingDeleteItem?.uri,
+        itemName = pendingDeleteItem?.name.orEmpty(),
+        mediaType = pendingDeleteItem?.type,
+        onConfirm = {
+            pendingDeleteItem?.let { slideshowViewModel.confirmDelete(it) }
+            pendingDeleteItem = null
+            showDeleteConfirm = false
+        },
+        onDismiss = {
+            slideshowViewModel.cancelDelete()
+            pendingDeleteItem = null
+            showDeleteConfirm = false
+        },
     )
 
     val albumLabel = albumPills.find { it.id == selectedAlbumId }?.label

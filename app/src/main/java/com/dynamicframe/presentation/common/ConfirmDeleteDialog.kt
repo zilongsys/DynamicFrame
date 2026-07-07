@@ -2,19 +2,25 @@ package com.dynamicframe.presentation.common
 
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.presentation.device.LocalDeviceProfile
+import com.dynamicframe.ui.components.AppAsyncImage
 import com.dynamicframe.ui.theme.NostalgiaAccentDeep
 import com.dynamicframe.ui.theme.requestFocusWhenReady
 import com.dynamicframe.ui.theme.safeClickable
@@ -25,8 +31,11 @@ fun ConfirmDeleteDialog(
     visible: Boolean,
     title: String,
     message: String,
+    thumbnailUri: String? = null,
+    itemName: String = "",
+    mediaType: MediaType? = null,
     onConfirm: () -> Unit,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
 ) {
     if (!visible) return
     val device = LocalDeviceProfile.current
@@ -42,39 +51,82 @@ fun ConfirmDeleteDialog(
         onDismissRequest = onDismiss,
         properties = DialogProperties(
             dismissOnBackPress = true,
-            dismissOnClickOutside = false
-        )
+            dismissOnClickOutside = false,
+        ),
     ) {
         Surface(
             shape = MaterialTheme.shapes.large,
             color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 6.dp
+            tonalElevation = 6.dp,
         ) {
             Column(
                 modifier = Modifier
                     .padding(horizontal = 24.dp, vertical = 20.dp)
                     .then(if (device.isTv) Modifier.focusGroup() else Modifier),
-                horizontalAlignment = Alignment.CenterHorizontally
+                horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Icon(
-                    Icons.Default.DeleteForever,
-                    contentDescription = null,
-                    tint = NostalgiaAccentDeep,
-                    modifier = Modifier.size(if (device.isTv) 40.dp else 32.dp)
+                if (thumbnailUri != null) {
+                    AppAsyncImage(
+                        uri = thumbnailUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        decodeWidth = 320,
+                        decodeHeight = 320,
+                        crossfadeMillis = 0,
+                        modifier = Modifier
+                            .size(if (device.isTv) 160.dp else 120.dp)
+                            .clip(RoundedCornerShape(12.dp)),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                } else {
+                    Icon(
+                        Icons.Default.DeleteForever,
+                        contentDescription = null,
+                        tint = NostalgiaAccentDeep,
+                        modifier = Modifier.size(if (device.isTv) 40.dp else 32.dp),
+                    )
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                Text(
+                    title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
                 )
-                Spacer(Modifier.height(12.dp))
-                Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
+
+                if (itemName.isNotBlank()) {
+                    Spacer(Modifier.height(6.dp))
+                    Text(
+                        itemName,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                        textAlign = TextAlign.Center,
+                    )
+                }
+
+                mediaType?.let { type ->
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        if (type == MediaType.VIDEO) "Vídeo" else "Foto",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.primary,
+                    )
+                }
+
                 Spacer(Modifier.height(8.dp))
                 Text(
                     message,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    textAlign = TextAlign.Center
+                    textAlign = TextAlign.Center,
                 )
                 Spacer(Modifier.height(20.dp))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                    horizontalArrangement = Arrangement.spacedBy(12.dp),
                 ) {
                     DialogActionButton(
                         label = "Cancelar",
@@ -82,16 +134,13 @@ fun ConfirmDeleteDialog(
                         onClick = onDismiss,
                         modifier = Modifier
                             .weight(1f)
-                            .then(if (device.isTv) Modifier.tvFocusRequester(cancelFocus) else Modifier)
+                            .then(if (device.isTv) Modifier.tvFocusRequester(cancelFocus) else Modifier),
                     )
                     DialogActionButton(
                         label = "Borrar",
                         primary = true,
-                        onClick = {
-                            onConfirm()
-                            onDismiss()
-                        },
-                        modifier = Modifier.weight(1f)
+                        onClick = onConfirm,
+                        modifier = Modifier.weight(1f),
                     )
                 }
             }
@@ -104,7 +153,7 @@ private fun DialogActionButton(
     label: String,
     primary: Boolean,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
 ) {
     val bg = if (primary) NostalgiaAccentDeep else MaterialTheme.colorScheme.surfaceVariant
     val fg = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
@@ -113,7 +162,7 @@ private fun DialogActionButton(
         modifier = modifier
             .safeClickable(onClick = onClick)
             .padding(vertical = 4.dp),
-        contentAlignment = Alignment.Center
+        contentAlignment = Alignment.Center,
     ) {
         Surface(color = bg, shape = MaterialTheme.shapes.medium, modifier = Modifier.fillMaxWidth()) {
             Text(
@@ -121,7 +170,7 @@ private fun DialogActionButton(
                 color = fg,
                 fontWeight = FontWeight.SemiBold,
                 modifier = Modifier.padding(vertical = 14.dp),
-                textAlign = TextAlign.Center
+                textAlign = TextAlign.Center,
             )
         }
     }

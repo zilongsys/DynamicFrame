@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.90
+
+### Corregido
+- **Borrar en slideshow**: captura la foto/vídeo actual al pulsar borrar; pausa slideshow, vídeo y música; diálogo con miniatura; borrado MediaStore/SAF con consentimiento del sistema si hace falta; reanuda al terminar.
+
 ## v0.1.89
 
 ### Corregido

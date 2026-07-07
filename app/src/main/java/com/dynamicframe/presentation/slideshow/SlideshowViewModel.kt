@@ -1,8 +1,10 @@
 package com.dynamicframe.presentation.slideshow
 
+import android.content.IntentSender
 import android.os.Build
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.dynamicframe.domain.model.DeleteMediaResult
 import com.dynamicframe.domain.model.MediaDynamicPalette
 import com.dynamicframe.domain.model.MediaAlbum
 import com.dynamicframe.domain.model.MediaItem
@@ -23,6 +25,7 @@ import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
 import com.dynamicframe.domain.usecase.DeleteMediaItemUseCase
 import com.dynamicframe.domain.usecase.EvictMediaCacheUseCase
+import com.dynamicframe.domain.usecase.TakeDeleteConsentUseCase
 import com.dynamicframe.domain.usecase.GetFolderDisplayNameUseCase
 import com.dynamicframe.domain.usecase.GetLocalAlbumsUseCase
 import com.dynamicframe.domain.usecase.GetVideoBlurThumbnailUseCase
@@ -54,6 +57,7 @@ class SlideshowViewModel @Inject constructor(
     observeMusicPlayback: ObserveMusicPlaybackUseCase,
     private val getLocalAlbums: GetLocalAlbumsUseCase,
     private val deleteMediaItem: DeleteMediaItemUseCase,
+    private val takeDeleteConsent: TakeDeleteConsentUseCase,
     private val evictMediaCache: EvictMediaCacheUseCase,
     private val preloadSlideshowImages: PreloadSlideshowImagesUseCase,
     private val updateSelectedAlbums: UpdateSelectedAlbumsUseCase,
@@ -68,6 +72,16 @@ class SlideshowViewModel @Inject constructor(
 ) : ViewModel() {
     private val _toastMessage = MutableStateFlow<String?>(null)
     val toastMessage: StateFlow<String?> = _toastMessage.asStateFlow()
+
+    private val _deleteConsentIntentSender = MutableStateFlow<IntentSender?>(null)
+    val deleteConsentIntentSender: StateFlow<IntentSender?> = _deleteConsentIntentSender.asStateFlow()
+
+    private var deleteContext: DeleteContext? = null
+
+    private data class DeleteContext(
+        val item: MediaItem,
+        val resumeAfter: Boolean,
+    )
 
     val slideshowState = slideshowEngine.state
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), slideshowEngine.state.value)
@@ -429,37 +443,107 @@ class SlideshowViewModel @Inject constructor(
         _toastMessage.value = null
     }
 
-    fun deleteItem(item: MediaItem) {
-        debug.w("UI", "deleteItem ${item.type} ${item.name}", item.uri)
-        viewModelScope.launch {
-            val wasPlaying = slideshowState.value.isPlaying
-            slideshowEngine.pause()
-            slideshowEngine.releaseCurrentForDelete()
-            evictMediaCache(item.uri)
-            delay(300)
+    /** Pausa slideshow, vídeo y música al abrir el diálogo de borrado. */
+    fun prepareDelete(item: MediaItem) {
+        deleteContext = DeleteContext(item, slideshowState.value.isPlaying)
+        pauseForDelete()
+    }
 
-            deleteMediaItem(item)
-                .onSuccess {
-                    slideshowEngine.removeItem(item.id)
-                    if (wasPlaying && slideshowEngine.state.value.playlistItems.isNotEmpty()) {
-                        slideshowEngine.start()
-                        musicCoordinator.resumePlayback()
-                    }
-                }
-                .onFailure { e ->
-                    debug.e("UI", "deleteItem falló", e.message)
-                    _toastMessage.value = e.message ?: "No se pudo borrar el archivo"
-                    slideshowEngine.loadMedia()
-                    if (wasPlaying) {
-                        slideshowEngine.start()
-                        musicCoordinator.resumePlayback()
-                    }
-                }
+    fun cancelDelete() {
+        val resume = deleteContext?.resumeAfter == true
+        deleteContext = null
+        if (resume) resumeAfterDelete()
+    }
+
+    fun confirmDelete(item: MediaItem) {
+        val ctx = deleteContext ?: DeleteContext(item, false)
+        deleteContext = null
+        performDelete(ctx.item, ctx.resumeAfter)
+    }
+
+    fun clearDeleteConsentIntent() {
+        _deleteConsentIntentSender.value = null
+    }
+
+    fun onDeleteConsentResult(granted: Boolean) {
+        clearDeleteConsentIntent()
+        val ctx = deleteContext
+        deleteContext = null
+        if (!granted || ctx == null) {
+            if (ctx?.resumeAfter == true) resumeAfterDelete()
+            if (!granted && ctx != null) {
+                _toastMessage.value = "Borrado cancelado"
+            }
+            return
+        }
+        viewModelScope.launch { onDeleteSucceeded(ctx.item, ctx.resumeAfter) }
+    }
+
+    private fun pauseForDelete() {
+        haltAllPlayback()
+        slideshowState.value.currentItem?.uri?.let { uri ->
+            runCatching { slideshowVideoPlayer.stopIfCurrent(uri) }
+            runCatching { videoBackdropPlayer.stopIfCurrent(uri) }
         }
     }
 
+    private fun performDelete(item: MediaItem, resumeAfter: Boolean) {
+        viewModelScope.launch {
+            pauseForDelete()
+            runCatching { slideshowVideoPlayer.stopIfCurrent(item.uri) }
+            runCatching { videoBackdropPlayer.stopIfCurrent(item.uri) }
+            evictMediaCache(item.uri)
+
+            when (val result = deleteMediaItem(item)) {
+                DeleteMediaResult.Deleted -> onDeleteSucceeded(item, resumeAfter)
+                is DeleteMediaResult.NeedsUserConsent -> {
+                    deleteContext = DeleteContext(item, resumeAfter)
+                    val sender = takeDeleteConsent(result.consentHandle) as? IntentSender
+                    if (sender != null) {
+                        _deleteConsentIntentSender.value = sender
+                    } else {
+                        onDeleteFailed("No se pudo solicitar permiso para borrar", resumeAfter)
+                    }
+                }
+                is DeleteMediaResult.Failed -> onDeleteFailed(result.message, resumeAfter)
+            }
+        }
+    }
+
+    private suspend fun onDeleteSucceeded(item: MediaItem, resumeAfter: Boolean) {
+        slideshowEngine.removeItem(item.id)
+        _toastMessage.value = if (item.type == MediaType.VIDEO) {
+            "Vídeo eliminado"
+        } else {
+            "Foto eliminada"
+        }
+        if (resumeAfter && slideshowEngine.state.value.playlistItems.isNotEmpty()) {
+            resumeAfterDelete()
+        }
+    }
+
+    private fun onDeleteFailed(message: String, resumeAfter: Boolean) {
+        _toastMessage.value = message
+        if (resumeAfter) resumeAfterDelete()
+    }
+
+    private fun resumeAfterDelete() {
+        if (_presentationPhase.value != SlideshowPresentationPhase.Presenting) return
+        if (slideshowEngine.state.value.playlistItems.isEmpty()) return
+        slideshowEngine.start()
+        viewModelScope.launch {
+            musicCoordinator.setPlaybackAllowed(true)
+            musicCoordinator.resumePlayback()
+            applyMusicDuckForCurrentSlide()
+        }
+    }
+
+    fun deleteItem(item: MediaItem) {
+        performDelete(item, slideshowState.value.isPlaying)
+    }
+
     fun deleteCurrentSlide() {
-        slideshowState.value.currentItem?.let { deleteItem(it) }
+        slideshowState.value.currentItem?.let { confirmDelete(it) }
     }
 
     override fun onCleared() {

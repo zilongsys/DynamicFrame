@@ -5,8 +5,11 @@ import android.content.ContentUris
 import android.content.Context
 import android.database.Cursor
 import android.net.Uri
+import android.os.Build
+import android.provider.DocumentsContract
 import android.provider.MediaStore
 import androidx.documentfile.provider.DocumentFile
+import com.dynamicframe.domain.model.DeleteMediaResult
 import com.dynamicframe.domain.model.MediaContentFilter
 import com.dynamicframe.domain.model.*
 import com.dynamicframe.domain.repository.MediaRepository
@@ -24,7 +27,8 @@ import javax.inject.Singleton
 @Singleton
 class LocalMediaRepository @Inject constructor(
     @ApplicationContext private val context: Context,
-    private val folderScanner: DocumentFolderScanner
+    private val folderScanner: DocumentFolderScanner,
+    private val deleteConsentStore: PendingDeleteConsentStore,
 ) : MediaRepository {
 
     private val contentResolver: ContentResolver = context.contentResolver
@@ -302,31 +306,69 @@ class LocalMediaRepository @Inject constructor(
         emit(getAllMediaItems(listOf(MediaSource.LOCAL)).getOrDefault(emptyList()))
     }.flowOn(Dispatchers.IO)
 
-    override suspend fun deleteMediaItem(item: MediaItem): Result<Unit> = withContext(Dispatchers.IO) {
-        runCatching {
-            val parsed = Uri.parse(item.uri)
-            when (parsed.scheme) {
-                "file" -> {
-                    val path = parsed.path ?: throw IOException("Ruta inválida")
-                    val file = File(path)
-                    if (!file.exists() || !file.delete()) {
-                        throw IOException("No se pudo borrar el archivo")
-                    }
+    override suspend fun deleteMediaItem(item: MediaItem): DeleteMediaResult = withContext(Dispatchers.IO) {
+        runCatching { deleteItemInternal(item) }
+            .fold(
+                onSuccess = { it },
+                onFailure = { e ->
+                    DeleteMediaResult.Failed(e.message ?: "No se pudo borrar el archivo")
+                },
+            )
+    }
+
+    private sealed interface InternalDeleteOutcome {
+        data object Deleted : InternalDeleteOutcome
+        data class NeedsConsent(val intentSender: android.content.IntentSender) : InternalDeleteOutcome
+    }
+
+    private fun deleteItemInternal(item: MediaItem): DeleteMediaResult {
+        val parsed = Uri.parse(item.uri)
+        return when (parsed.scheme) {
+            "file" -> {
+                val path = parsed.path ?: throw IOException("Ruta inválida")
+                val file = File(path)
+                when {
+                    !file.exists() -> DeleteMediaResult.Deleted
+                    file.delete() -> DeleteMediaResult.Deleted
+                    else -> throw IOException("No se pudo borrar el archivo")
                 }
-                "content" -> {
-                    try {
-                        val rows = contentResolver.delete(parsed, null, null)
-                        if (rows > 0) return@runCatching
-                    } catch (e: SecurityException) {
-                        // Android 10+: borrar medios ajenos requiere confirmación del sistema.
-                        throw IOException("Este archivo requiere confirmación del sistema para borrarse.")
-                    }
-                    val doc = DocumentFile.fromSingleUri(context, parsed)
-                    if (doc != null && doc.delete()) return@runCatching
-                    throw IOException("No se pudo borrar. Puede requerir permiso del sistema.")
-                }
-                else -> throw IOException("Tipo de archivo no soportado para borrar")
+            }
+            "content" -> when (val outcome = deleteContentUri(parsed)) {
+                InternalDeleteOutcome.Deleted -> DeleteMediaResult.Deleted
+                is InternalDeleteOutcome.NeedsConsent -> DeleteMediaResult.NeedsUserConsent(
+                    deleteConsentStore.register(outcome.intentSender),
+                )
+            }
+            else -> throw IOException("Tipo de archivo no soportado para borrar")
+        }
+    }
+
+    private fun deleteContentUri(uri: Uri): InternalDeleteOutcome {
+        if (DocumentsContract.isDocumentUri(context, uri)) {
+            val doc = DocumentFile.fromSingleUri(context, uri)
+            if (doc != null && doc.exists() && doc.delete()) {
+                return InternalDeleteOutcome.Deleted
             }
         }
+
+        try {
+            val rows = contentResolver.delete(uri, null, null)
+            if (rows > 0) return InternalDeleteOutcome.Deleted
+        } catch (e: android.app.RecoverableSecurityException) {
+            return InternalDeleteOutcome.NeedsConsent(e.userAction.actionIntent.intentSender)
+        } catch (_: SecurityException) {
+            // Intentar otras vías abajo.
+        }
+
+        DocumentFile.fromSingleUri(context, uri)?.takeIf { it.exists() && it.delete() }?.let {
+            return InternalDeleteOutcome.Deleted
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            val pending = MediaStore.createDeleteRequest(contentResolver, listOf(uri))
+            return InternalDeleteOutcome.NeedsConsent(pending.intentSender)
+        }
+
+        throw IOException("No se pudo borrar. Puede requerir permiso del sistema.")
     }
 }

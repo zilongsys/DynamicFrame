@@ -124,10 +124,16 @@ class GetSlideshowConfigUseCase @Inject constructor(
         settingsRepository.getConfig()
 }
 
+class TakeDeleteConsentUseCase @Inject constructor(
+    private val accessor: DeleteConsentAccessor,
+) {
+    operator fun invoke(handle: String): Any? = accessor.take(handle)
+}
+
 class DeleteMediaItemUseCase @Inject constructor(
     private val mediaRepository: MediaRepository
 ) {
-    suspend operator fun invoke(item: MediaItem): Result<Unit> =
+    suspend operator fun invoke(item: MediaItem): DeleteMediaResult =
         mediaRepository.deleteMediaItem(item)
 }
 

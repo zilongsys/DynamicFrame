@@ -1,5 +1,9 @@
 package com.dynamicframe.presentation.slideshow
 
+import android.app.Activity
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.animation.core.tween
@@ -61,7 +65,20 @@ fun SlideshowScreen(
     val toastMessage by viewModel.toastMessage.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
     var showDeleteConfirm by remember { mutableStateOf(false) }
-    var resumeAfterDeleteDismiss by remember { mutableStateOf(false) }
+    var pendingDeleteItem by remember { mutableStateOf<com.dynamicframe.domain.model.MediaItem?>(null) }
+    val deleteConsentIntentSender by viewModel.deleteConsentIntentSender.collectAsStateWithLifecycle()
+
+    val deleteConsentLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult(),
+    ) { result ->
+        viewModel.onDeleteConsentResult(result.resultCode == Activity.RESULT_OK)
+    }
+
+    LaunchedEffect(deleteConsentIntentSender) {
+        val sender = deleteConsentIntentSender ?: return@LaunchedEffect
+        deleteConsentLauncher.launch(IntentSenderRequest.Builder(sender).build())
+        viewModel.clearDeleteConsentIntent()
+    }
     val (controlHint, setControlHint) = rememberControlHintState(
         if (isTV) "Abajo/OK: controles · Atrás: salir" else "Toca la pantalla para ver controles"
     )
@@ -84,18 +101,21 @@ fun SlideshowScreen(
         visible = showDeleteConfirm,
         title = "¿Borrar esta foto o vídeo?",
         message = "Se eliminará del dispositivo. Esta acción no se puede deshacer.",
+        thumbnailUri = pendingDeleteItem?.let { item ->
+            item.thumbnailUri ?: item.uri
+        },
+        itemName = pendingDeleteItem?.name.orEmpty(),
+        mediaType = pendingDeleteItem?.type,
         onConfirm = {
-            resumeAfterDeleteDismiss = false
             showDeleteConfirm = false
-            viewModel.deleteCurrentSlide()
+            pendingDeleteItem?.let { viewModel.confirmDelete(it) }
+            pendingDeleteItem = null
         },
         onDismiss = {
             showDeleteConfirm = false
-            if (resumeAfterDeleteDismiss) {
-                viewModel.startSlideshow()
-            }
-            resumeAfterDeleteDismiss = false
-        }
+            viewModel.cancelDelete()
+            pendingDeleteItem = null
+        },
     )
 
     var showControls by remember { mutableStateOf(false) }
@@ -232,8 +252,9 @@ fun SlideshowScreen(
             onBack = onBack,
             onDelete = {
                 touch()
-                resumeAfterDeleteDismiss = slideshowState.isPlaying
-                viewModel.pauseSlideshow()
+                val item = slideshowState.currentItem ?: return@PlaybackControlsCallbacks
+                pendingDeleteItem = item
+                viewModel.prepareDelete(item)
                 showDeleteConfirm = true
             },
             onOpenSettings = { touch(); onOpenSettings() },
