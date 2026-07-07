@@ -5,6 +5,7 @@ import com.dynamicframe.data.local.CoilImageCacheRepository
 import com.dynamicframe.data.local.DataStoreSettingsRepository
 import com.dynamicframe.data.local.LocalMediaRepository
 import com.dynamicframe.data.local.LocalMusicRepository
+import com.dynamicframe.data.local.LocalStorageBrowserRepository
 import com.dynamicframe.data.local.DeleteConsentAccessorImpl
 import com.dynamicframe.domain.repository.DeleteConsentAccessor
 import com.dynamicframe.data.local.MediaMetadataVideoThumbnailRepository

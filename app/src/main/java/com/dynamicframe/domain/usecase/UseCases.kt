@@ -1,6 +1,7 @@
 package com.dynamicframe.domain.usecase
 
 import com.dynamicframe.domain.model.*
+import com.dynamicframe.domain.repository.DeleteConsentAccessor
 import com.dynamicframe.domain.repository.ImageCacheRepository
 import com.dynamicframe.domain.repository.MediaRepository
 import com.dynamicframe.domain.repository.MusicRepository

@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.91
+
+### Corregido
+- **KSP/Hilt**: imports faltantes de `LocalStorageBrowserRepository` y `DeleteConsentAccessor` (fallo `NonExistentClass`).
+
 ## v0.1.90
 
 ### Corregido

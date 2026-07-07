@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Fix KSP imports borrado slideshow
+- Estado: Completado
+- Descripción: Restaurar imports LocalStorageBrowserRepository y DeleteConsentAccessor en RepositoryModule/UseCases.
+
 ## 2026-06-22 — Borrar en slideshow (miniatura, pausa, borrado real)
 - Estado: Completado
 - Descripción: Captura ítem al pulsar borrar; diálogo con miniatura; pausa total; MediaStore/SAF + consentimiento sistema; reanuda tras borrar.
