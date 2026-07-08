@@ -24,32 +24,33 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
     private var onEnded: (() -> Unit)? = null
     private var onError: (() -> Unit)? = null
     private var currentUri: String? = null
+    private var audioMuted: Boolean = true
 
     override val player: Player
         get() = obtainPlayer()
 
     private fun obtainPlayer(): ExoPlayer {
         return exoPlayer ?: ExoPlayer.Builder(context).build().apply {
-            // Coordinación de audio: el vídeo no pide audio focus del sistema;
-            // la atenuación de la música se gestiona en la capa de dominio.
-            setAudioAttributes(
-                AudioAttributes.Builder()
-                    .setUsage(C.USAGE_MEDIA)
-                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                    .build(),
-                /* handleAudioFocus = */ false
-            )
+            applyAudioAttributes(this, audioMuted)
         }.also { exoPlayer = it }
+    }
+
+    private fun applyAudioAttributes(player: ExoPlayer, muted: Boolean) {
+        player.setAudioAttributes(
+            AudioAttributes.Builder()
+                .setUsage(C.USAGE_MEDIA)
+                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                .build(),
+            /* handleAudioFocus = */ !muted,
+        )
     }
 
     override fun prepare(uri: String, volume: Float, mute: Boolean, playing: Boolean) {
         debug.d("Video", "prepare playing=$playing mute=$mute uri=${uri.takeLast(48)}")
         runCatching {
             val p = obtainPlayer()
-            // No llamamos stop()+clearMediaItems() antes de setMediaItem(): hacerlo provoca
-            // un breve flash negro al cambiar de vídeo porque el player queda en STATE_IDLE
-            // hasta que prepare() termina. Con setMediaItem() directo ExoPlayer hace un
-            // seek-to-start implícito y empieza a decodificar sin interrumpir el display.
+            audioMuted = mute
+            applyAudioAttributes(p, mute)
             p.setMediaItem(MediaItem.fromUri(uri))
             p.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
             p.prepare()
@@ -71,7 +72,12 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
 
     override fun setVolume(volume: Float, mute: Boolean) {
         runCatching {
-            exoPlayer?.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
+            val p = exoPlayer ?: return
+            if (audioMuted != mute) {
+                audioMuted = mute
+                applyAudioAttributes(p, mute)
+            }
+            p.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
         }
     }
 

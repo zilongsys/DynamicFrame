@@ -52,6 +52,7 @@ class DataStoreSettingsRepository @Inject constructor(
             prefs[Keys.MEDIA_VOLUME] = config.mediaVolume
             prefs[Keys.MUTE_VIDEO] = config.muteVideoAudio
             prefs[Keys.VIDEO_PLAY_FULL] = config.videoPlayFull
+            prefs[Keys.VIDEO_DYNAMIC_BACKDROP] = config.videoDynamicBackdropMode.name
             prefs[Keys.BRIGHTNESS] = config.brightness
             prefs[Keys.SELECTED_ALBUMS] = config.selectedAlbumIds.joinToString("|")
             prefs[Keys.MUSIC_PLAYLIST] = config.musicPlaylistId ?: ""
@@ -146,6 +147,10 @@ class DataStoreSettingsRepository @Inject constructor(
         mediaVolume = this[Keys.MEDIA_VOLUME] ?: 1.0f,
         muteVideoAudio = this[Keys.MUTE_VIDEO] ?: false,
         videoPlayFull = this[Keys.VIDEO_PLAY_FULL] ?: true,
+        videoDynamicBackdropMode = enumOrDefault(
+            this[Keys.VIDEO_DYNAMIC_BACKDROP],
+            VideoDynamicBackdropMode.STATIC,
+        ),
         brightness = this[Keys.BRIGHTNESS] ?: 1.0f,
         selectedAlbumIds = splitList(this[Keys.SELECTED_ALBUMS]),
         musicPlaylistId = this[Keys.MUSIC_PLAYLIST]?.ifBlank { null },

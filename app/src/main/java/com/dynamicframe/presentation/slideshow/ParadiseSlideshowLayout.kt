@@ -46,7 +46,7 @@ import com.dynamicframe.domain.model.MusicPlayerState
 import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.SlideshowState
 import com.dynamicframe.domain.model.TransitionType
-import com.dynamicframe.domain.model.WeatherInfo
+import com.dynamicframe.domain.model.VideoDynamicBackdropMode
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
 import com.dynamicframe.ui.components.AppAsyncImage
@@ -81,6 +81,7 @@ fun ParadiseSlideshowMediaStack(
 ) {
     val playlistItems = slideshowState.playlistItems
     val currentIndex = slideshowState.currentIndex
+    val animatedVideoBackdrop = config.videoDynamicBackdropMode == VideoDynamicBackdropMode.ANIMATED
 
     Box(
         modifier = modifier
@@ -106,6 +107,7 @@ fun ParadiseSlideshowMediaStack(
                     playToken = slideshowState.playToken,
                     videoBackdropPlayer = videoBackdropPlayer,
                     videoBlurThumbnailUri = videoBlurThumbnailUri,
+                    animatedVideoBackdrop = animatedVideoBackdrop,
                     modifier = Modifier.fillMaxSize(),
                 )
             }
@@ -151,6 +153,7 @@ fun ParadiseSlideshowMediaStack(
                             onVideoEnded = onVideoEnded,
                             onPlaybackError = onPlaybackError,
                             onPreloadImages = onPreloadImages,
+                            videoDynamicBackdropMode = config.videoDynamicBackdropMode,
                             skipLetterboxBackground = true,
                             externalCrossfade = true,
                             modifier = Modifier.fillMaxSize(),
@@ -171,6 +174,7 @@ fun ParadiseBlurBackdrop(
     playToken: Int,
     videoBackdropPlayer: VideoBackdropPlayerRepository,
     videoBlurThumbnailUri: String?,
+    animatedVideoBackdrop: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     Box(
@@ -197,14 +201,33 @@ fun ParadiseBlurBackdrop(
                 )
             }
             MediaType.VIDEO -> {
-                ParadiseVideoBlurBackdrop(
-                    uri = item.uri,
-                    isPlaying = isPlaying,
-                    playToken = playToken,
-                    backdropPlayer = videoBackdropPlayer,
-                    fallbackThumbnailUri = videoBlurThumbnailUri,
-                    modifier = Modifier.fillMaxSize()
-                )
+                if (animatedVideoBackdrop) {
+                    ParadiseVideoBlurBackdrop(
+                        uri = item.uri,
+                        isPlaying = isPlaying,
+                        playToken = playToken,
+                        backdropPlayer = videoBackdropPlayer,
+                        fallbackThumbnailUri = videoBlurThumbnailUri,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    val thumbUri = videoBlurThumbnailUri ?: item.uri
+                    AppAsyncImage(
+                        uri = thumbUri,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        decodeWidth = 960,
+                        decodeHeight = 540,
+                        crossfadeMillis = 0,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                    AppBlurFillImage(
+                        uri = thumbUri,
+                        contentScale = ContentScale.Crop,
+                        alpha = 1f,
+                        modifier = Modifier.fillMaxSize(),
+                    )
+                }
             }
         }
     }

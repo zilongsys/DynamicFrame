@@ -13,7 +13,7 @@ import com.dynamicframe.domain.model.MediaSource
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.PlaybackBackgroundType
 import com.dynamicframe.domain.model.SlideshowConfig
-import com.dynamicframe.domain.model.WeatherInfo
+import com.dynamicframe.domain.model.VideoDynamicBackdropMode
 import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.domain.model.isParadiseActive
 import com.dynamicframe.domain.model.photoFolderPillId
@@ -168,9 +168,19 @@ class SlideshowViewModel @Inject constructor(
         }
 
         viewModelScope.launch {
-            slideshowState
-                .map { it.currentItem }
-                .distinctUntilChanged()
+            combine(
+                slideshowState.map { it.currentItem }.distinctUntilChanged(),
+                slideshowConfig.map {
+                    listOf(
+                        it.muteVideoAudio,
+                        it.videoMusicBehavior.name,
+                        it.duckedMusicVolume,
+                        it.videoDynamicBackdropMode.name,
+                        it.playbackBackgroundType.name,
+                        it.isParadiseActive(),
+                    )
+                }.distinctUntilChanged(),
+            ) { item, _ -> item }
                 .collect { item ->
                     if (_presentationPhase.value != SlideshowPresentationPhase.Presenting) return@collect
                     viewModelScope.launch { updateVideoBlurThumbnail(item) }
@@ -352,16 +362,29 @@ class SlideshowViewModel @Inject constructor(
         val item = slideshowState.value.currentItem ?: return
         val config = slideshowConfig.value
         when (item.type) {
-            MediaType.VIDEO ->
+            MediaType.VIDEO -> {
                 if (config.muteVideoAudio) {
                     musicCoordinator.onPhotoShown(config.musicVolume)
                 } else {
+                    musicCoordinator.resetDuckedState()
                     musicCoordinator.onVideoStarted(
                         config.videoMusicBehavior,
                         config.duckedMusicVolume,
                     )
                 }
-            MediaType.IMAGE -> musicCoordinator.onPhotoShown(config.musicVolume)
+                val useAnimatedBackdrop = config.videoDynamicBackdropMode == VideoDynamicBackdropMode.ANIMATED &&
+                    (
+                        config.playbackBackgroundType == PlaybackBackgroundType.DYNAMIC ||
+                            config.isParadiseActive()
+                        )
+                if (!useAnimatedBackdrop) {
+                    runCatching { videoBackdropPlayer.stopIfCurrent(item.uri) }
+                }
+            }
+            MediaType.IMAGE -> {
+                runCatching { videoBackdropPlayer.stop() }
+                musicCoordinator.onPhotoShown(config.musicVolume)
+            }
         }
     }
 

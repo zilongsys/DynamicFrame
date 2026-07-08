@@ -360,6 +360,22 @@ fun SettingsScreen(
                         note = "Espera a que el video termine antes de pasar al siguiente medio.",
                         onCheckedChange = { viewModel.updateConfig(config.copy(videoPlayFull = it)) }
                     )
+                    if (config.playbackBackgroundType == PlaybackBackgroundType.DYNAMIC ||
+                        config.isParadiseActive()
+                    ) {
+                        SettingsDropdownItem(
+                            title = "Fondo en vídeos",
+                            icon = Icons.Default.Wallpaper,
+                            currentValue = config.videoDynamicBackdropMode.displayName(),
+                            options = VideoDynamicBackdropMode.entries.map { it.displayName() },
+                            note = "Fijo: miniatura difuminada (como las fotos). Animado: el fondo sigue el vídeo. Fijo evita conflictos de audio y consume menos recursos.",
+                            onSelect = { idx ->
+                                viewModel.updateConfig(
+                                    config.copy(videoDynamicBackdropMode = VideoDynamicBackdropMode.entries[idx]),
+                                )
+                            },
+                        )
+                    }
                 }
             }
 

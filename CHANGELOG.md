@@ -1,5 +1,13 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.93
+
+### Añadido
+- **Ajustes → Vídeos → Fondo en vídeos**: fijo (miniatura difuminada, como fotos) o animado (sigue el vídeo), con fondo dinámico o tema Paradise.
+
+### Corregido
+- **Audio de vídeo inestable**: el reproductor de fondo ya no decodifica audio; el vídeo principal gestiona el audio focus solo cuando no está silenciado; un solo decodificador en modo fijo.
+
 ## v0.1.92
 
 ### Actualizado

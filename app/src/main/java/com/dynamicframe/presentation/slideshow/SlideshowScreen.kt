@@ -421,6 +421,7 @@ fun SlideshowScreen(
                         null
                     },
                     videoBlurThumbnailUri = videoBlurThumbnailUri,
+                    videoDynamicBackdropMode = config.videoDynamicBackdropMode,
                     modifier = Modifier.fillMaxSize()
                 )
             }

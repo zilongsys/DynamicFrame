@@ -6,6 +6,7 @@ import android.os.Build
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -36,6 +37,12 @@ fun ParadiseVideoBlurBackdrop(
     }
     LaunchedEffect(isPlaying) {
         backdropPlayer.setPlaying(isPlaying)
+    }
+
+    DisposableEffect(uri) {
+        onDispose {
+            backdropPlayer.stopIfCurrent(uri)
+        }
     }
 
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {

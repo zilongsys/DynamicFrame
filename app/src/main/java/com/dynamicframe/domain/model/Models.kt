@@ -73,6 +73,19 @@ enum class VideoMusicBehavior {
     DUCK
 }
 
+/** Fondo letterbox en vídeos con modo dinámico o Paradise. */
+enum class VideoDynamicBackdropMode {
+    /** Miniatura + blur fijos (como las fotos). */
+    STATIC,
+    /** El fondo reproduce el vídeo difuminado en sincronía. */
+    ANIMATED;
+
+    fun displayName(): String = when (this) {
+        STATIC -> "Fijo (como fotos)"
+        ANIMATED -> "Animado (sigue el vídeo)"
+    }
+}
+
 data class SlideshowConfig(
     val intervalSeconds: Int = 8,
     val transition: TransitionType = TransitionType.CROSSFADE,
@@ -88,6 +101,8 @@ data class SlideshowConfig(
     val mediaVolume: Float = 1.0f,
     val muteVideoAudio: Boolean = false,
     val videoPlayFull: Boolean = true,
+    /** Fondo dinámico/Paradise en vídeos: fijo o animado con el vídeo. */
+    val videoDynamicBackdropMode: VideoDynamicBackdropMode = VideoDynamicBackdropMode.STATIC,
     val brightness: Float = 1.0f,
     val selectedAlbumIds: List<String> = emptyList(),
     val musicPlaylistId: String? = null,

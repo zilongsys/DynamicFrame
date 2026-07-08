@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Fondo vídeo fijo/animado + fix audio vídeo
+- Estado: Completado
+- Descripción: Opción videoDynamicBackdropMode en Ajustes; backdrop sin audio; audio focus en vídeo principal.
+
 ## 2026-06-22 — Diagnóstico de error al borrar en slideshow
 - Estado: Completado
 - Descripción: DeleteMediaFailure con causa, solución y acciones; diálogo en UI; detección en LocalMediaRepository.

@@ -25,12 +25,16 @@ class ExoVideoBackdropPlayerRepository @Inject constructor(
     private fun obtainPlayer(): ExoPlayer =
         exoPlayer ?: ExoPlayer.Builder(context).build().apply {
             volume = 0f
+            trackSelectionParameters = trackSelectionParameters
+                .buildUpon()
+                .setTrackTypeDisabled(C.TRACK_TYPE_AUDIO, true)
+                .build()
             setAudioAttributes(
                 AudioAttributes.Builder()
                     .setUsage(C.USAGE_MEDIA)
                     .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
                     .build(),
-                false
+                false,
             )
         }.also { exoPlayer = it }
 

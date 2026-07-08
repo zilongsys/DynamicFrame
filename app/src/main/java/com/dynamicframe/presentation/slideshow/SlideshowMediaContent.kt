@@ -22,6 +22,7 @@ import com.dynamicframe.domain.model.MediaItem
 import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.PlaybackBackgroundType
 import com.dynamicframe.domain.model.TransitionType
+import com.dynamicframe.domain.model.VideoDynamicBackdropMode
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
 import com.dynamicframe.domain.slideshow.DynamicBackdropPrefetcher
@@ -63,6 +64,7 @@ fun SlideshowMediaViewport(
     dynamicPalette: MediaDynamicPalette? = null,
     dynamicPalettes: Map<String, MediaDynamicPalette> = emptyMap(),
     videoBlurThumbnailUri: String? = null,
+    videoDynamicBackdropMode: VideoDynamicBackdropMode = VideoDynamicBackdropMode.STATIC,
     skipLetterboxBackground: Boolean = false,
     externalCrossfade: Boolean = false,
     modifier: Modifier = Modifier
@@ -70,6 +72,9 @@ fun SlideshowMediaViewport(
     val decodeSize = rememberMaxDecodeSize()
     val isVideo = currentItem.type == MediaType.VIDEO
     val useDynamicBackground = backgroundType == PlaybackBackgroundType.DYNAMIC && !skipLetterboxBackground
+    val useAnimatedVideoBackdrop = isVideo &&
+        useDynamicBackground &&
+        videoDynamicBackdropMode == VideoDynamicBackdropMode.ANIMATED
     val dynamicBackgroundInTransition = useDynamicBackground && !isVideo && !externalCrossfade
     val dynamicDecodeW = DynamicBackdropPrefetcher.DECODE_WIDTH
     val dynamicDecodeH = DynamicBackdropPrefetcher.DECODE_HEIGHT
@@ -93,6 +98,12 @@ fun SlideshowMediaViewport(
 
     LaunchedEffect(currentItem.id) {
         compositeReady = null
+    }
+
+    LaunchedEffect(isVideo, useAnimatedVideoBackdrop, currentItem.id) {
+        if (isVideo && !useAnimatedVideoBackdrop) {
+            videoBackdropPlayer?.stop()
+        }
     }
 
     // Retención: solo tras transición Y cuando foto+fondo están listos (evita fondo solo / blanco).
@@ -137,7 +148,7 @@ fun SlideshowMediaViewport(
                         palette = dynamicPalette ?: dynamicPalettes[currentItem.id],
                         isPlaying = isPlaying,
                         playToken = playToken,
-                        videoBackdropPlayer = videoBackdropPlayer,
+                        videoBackdropPlayer = if (useAnimatedVideoBackdrop) videoBackdropPlayer else null,
                         videoBlurThumbnailUri = videoBlurThumbnailUri,
                         animateImageLoad = false,
                         modifier = Modifier.fillMaxSize(),
@@ -220,7 +231,7 @@ fun SlideshowMediaViewport(
                 onVideoEnded = onVideoEnded,
                 onPlaybackError = onPlaybackError,
                 playToken = playToken,
-                backdropPlayer = videoBackdropPlayer,
+                backdropPlayer = if (useAnimatedVideoBackdrop) videoBackdropPlayer else null,
                 modifier = Modifier.fillMaxSize()
             )
         }

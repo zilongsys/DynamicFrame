@@ -21,6 +21,7 @@ object SlideshowPreferencesKeys {
     val MEDIA_VOLUME = floatPreferencesKey("media_volume")
     val MUTE_VIDEO = booleanPreferencesKey("mute_video")
     val VIDEO_PLAY_FULL = booleanPreferencesKey("video_play_full")
+    val VIDEO_DYNAMIC_BACKDROP = stringPreferencesKey("video_dynamic_backdrop_mode")
     val BRIGHTNESS = floatPreferencesKey("brightness")
     val SELECTED_ALBUMS = stringPreferencesKey("selected_album_ids")
     val MUSIC_PLAYLIST = stringPreferencesKey("music_playlist_id")
