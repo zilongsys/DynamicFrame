@@ -116,6 +116,8 @@ class SlideshowMusicCoordinator @Inject constructor(
 
     fun onPhotoShown(normalVolume: Float) = music.onPhotoShown(normalVolume)
 
+    fun resetDuckedState() = music.resetDuckedState()
+
     fun disconnect() = music.disconnect()
 
     fun musicConfigKey(

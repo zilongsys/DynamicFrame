@@ -47,6 +47,7 @@ import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.SlideshowState
 import com.dynamicframe.domain.model.TransitionType
 import com.dynamicframe.domain.model.VideoDynamicBackdropMode
+import com.dynamicframe.domain.model.WeatherInfo
 import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
 import com.dynamicframe.ui.components.AppAsyncImage

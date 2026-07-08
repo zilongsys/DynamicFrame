@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.94
+
+### Corregido
+- **Compilación**: import `WeatherInfo` restaurado; `resetDuckedState()` expuesto en `SlideshowMusicCoordinator`.
+
 ## v0.1.93
 
 ### Añadido

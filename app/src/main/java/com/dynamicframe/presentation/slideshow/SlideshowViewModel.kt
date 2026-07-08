@@ -14,6 +14,7 @@ import com.dynamicframe.domain.model.MediaType
 import com.dynamicframe.domain.model.PlaybackBackgroundType
 import com.dynamicframe.domain.model.SlideshowConfig
 import com.dynamicframe.domain.model.VideoDynamicBackdropMode
+import com.dynamicframe.domain.model.WeatherInfo
 import com.dynamicframe.domain.model.hasCustomMediaFolders
 import com.dynamicframe.domain.model.isParadiseActive
 import com.dynamicframe.domain.model.photoFolderPillId
