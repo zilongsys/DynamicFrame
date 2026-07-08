@@ -1,5 +1,10 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.95
+
+### Corregido
+- **Vídeos congelados con fondo fijo**: el `prepare` del reproductor ya no captura `isPlaying` obsoleto (tras `beginSession` pausado) y pausa al terminar; audio focus del vídeo principal desactivado de nuevo para no competir con la música de fondo.
+
 ## v0.1.94
 
 ### Corregido

@@ -24,33 +24,26 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
     private var onEnded: (() -> Unit)? = null
     private var onError: (() -> Unit)? = null
     private var currentUri: String? = null
-    private var audioMuted: Boolean = true
 
     override val player: Player
         get() = obtainPlayer()
 
     private fun obtainPlayer(): ExoPlayer {
         return exoPlayer ?: ExoPlayer.Builder(context).build().apply {
-            applyAudioAttributes(this, audioMuted)
+            setAudioAttributes(
+                AudioAttributes.Builder()
+                    .setUsage(C.USAGE_MEDIA)
+                    .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
+                    .build(),
+                /* handleAudioFocus = */ false,
+            )
         }.also { exoPlayer = it }
-    }
-
-    private fun applyAudioAttributes(player: ExoPlayer, muted: Boolean) {
-        player.setAudioAttributes(
-            AudioAttributes.Builder()
-                .setUsage(C.USAGE_MEDIA)
-                .setContentType(C.AUDIO_CONTENT_TYPE_MOVIE)
-                .build(),
-            /* handleAudioFocus = */ !muted,
-        )
     }
 
     override fun prepare(uri: String, volume: Float, mute: Boolean, playing: Boolean) {
         debug.d("Video", "prepare playing=$playing mute=$mute uri=${uri.takeLast(48)}")
         runCatching {
             val p = obtainPlayer()
-            audioMuted = mute
-            applyAudioAttributes(p, mute)
             p.setMediaItem(MediaItem.fromUri(uri))
             p.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
             p.prepare()
@@ -72,12 +65,7 @@ class ExoSlideshowVideoPlayerRepository @Inject constructor(
 
     override fun setVolume(volume: Float, mute: Boolean) {
         runCatching {
-            val p = exoPlayer ?: return
-            if (audioMuted != mute) {
-                audioMuted = mute
-                applyAudioAttributes(p, mute)
-            }
-            p.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
+            exoPlayer?.volume = if (mute) 0f else volume.coerceIn(0f, 1f)
         }
     }
 

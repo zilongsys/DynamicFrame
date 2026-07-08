@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-06-22 — Vídeos pausados con fondo estático
+- Estado: Completado
+- Descripción: Fix race isPlaying en SlideshowVideoPlayer; revertir audio focus dinámico en vídeo principal.
+
 ## 2026-06-22 — Fondo vídeo fijo/animado + fix audio vídeo
 - Estado: Completado
 - Descripción: Opción videoDynamicBackdropMode en Ajustes; backdrop sin audio; audio focus en vídeo principal.

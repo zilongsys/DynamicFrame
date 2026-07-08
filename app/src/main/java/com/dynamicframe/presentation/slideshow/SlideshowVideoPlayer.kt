@@ -60,12 +60,14 @@ fun SlideshowVideoPlayer(
     val currentOnError by rememberUpdatedState(onPlaybackError)
     val currentUri by rememberUpdatedState(uri)
     val currentBackdrop by rememberUpdatedState(backdropPlayer)
+    val currentIsPlaying by rememberUpdatedState(isPlaying)
+    val currentMediaVolume by rememberUpdatedState(mediaVolume)
+    val currentMuteAudio by rememberUpdatedState(muteAudio)
 
-    // Preparar al cambiar la URI o el playToken (este último permite reiniciar el
-    // MISMO vídeo, p. ej. al hacer bucle con un único vídeo). No re-prepara al
-    // pausar o cambiar volumen.
+    // Preparar al cambiar la URI o el playToken. isPlaying se lee con rememberUpdatedState
+    // para no capturar false obsoleto (p. ej. tras beginSession startPaused) y pausar al final.
     LaunchedEffect(uri, playToken) {
-        videoPlayer.prepare(uri, mediaVolume, muteAudio, isPlaying)
+        videoPlayer.prepare(uri, currentMediaVolume, currentMuteAudio, currentIsPlaying)
     }
 
     // Play/pausa sin reiniciar el vídeo.

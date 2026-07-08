@@ -367,7 +367,6 @@ class SlideshowViewModel @Inject constructor(
                 if (config.muteVideoAudio) {
                     musicCoordinator.onPhotoShown(config.musicVolume)
                 } else {
-                    musicCoordinator.resetDuckedState()
                     musicCoordinator.onVideoStarted(
                         config.videoMusicBehavior,
                         config.duckedMusicVolume,
@@ -379,7 +378,7 @@ class SlideshowViewModel @Inject constructor(
                             config.isParadiseActive()
                         )
                 if (!useAnimatedBackdrop) {
-                    runCatching { videoBackdropPlayer.stopIfCurrent(item.uri) }
+                    runCatching { videoBackdropPlayer.stop() }
                 }
             }
             MediaType.IMAGE -> {
