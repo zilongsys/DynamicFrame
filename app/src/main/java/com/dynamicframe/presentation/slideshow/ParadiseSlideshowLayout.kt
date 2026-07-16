@@ -528,17 +528,19 @@ fun ParadiseInfoOverlays(
             ParadiseClock(
                 showDate = config.showDate,
                 modifier = Modifier
-                    .align(Alignment.BottomStart)
-                    .padding(start = 44.dp, bottom = 52.dp),
+                    .align(config.clockPosition.toAlignment())
+                    .padding(config.clockPosition.toOverlayPadding(paradise = true)),
             )
         }
 
-        ParadiseMusicPill(
-            musicState = musicState,
-            modifier = Modifier
-                .align(Alignment.BottomCenter)
-                .padding(bottom = 52.dp),
-        )
+        if (!config.playbackImmersiveMode && config.playbackShowOverlay) {
+            ParadiseMusicPill(
+                musicState = musicState,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = 52.dp),
+            )
+        }
 
         ParadisePhotoAttribution(
             currentItem = slideshowState.currentItem,

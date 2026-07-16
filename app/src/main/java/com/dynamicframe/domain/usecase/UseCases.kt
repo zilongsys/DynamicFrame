@@ -87,9 +87,9 @@ class GetMusicTracksUseCase @Inject constructor(
                     if (folders.isEmpty()) emptyList()
                     else musicRepository.getTracksFromFolders(folders).getOrNull().orEmpty()
                 }
-                MusicSourceType.DEVICE_LIBRARY, MusicSourceType.THEME ->
+                MusicSourceType.DEVICE_LIBRARY ->
                     musicRepository.getLocalTracks().getOrNull().orEmpty()
-                MusicSourceType.SPOTIFY, MusicSourceType.YOUTUBE ->
+                MusicSourceType.THEME, MusicSourceType.SPOTIFY, MusicSourceType.YOUTUBE ->
                     emptyList()
             }
             tracks.addAll(fromSource)

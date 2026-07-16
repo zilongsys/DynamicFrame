@@ -143,7 +143,7 @@ data class SlideshowConfig(
     /** Zoom del contenido en pantalla completa (1.0 = borde a borde) */
     val playbackContentZoom: Float = 1.0f,
     /** Fondo detrás de fotos/vídeos (letterbox) */
-    val playbackBackgroundType: PlaybackBackgroundType = PlaybackBackgroundType.DEMO_LAVENDER,
+    val playbackBackgroundType: PlaybackBackgroundType = PlaybackBackgroundType.BLACK,
     /** URI de imagen personalizada para fondo (si type = CUSTOM_IMAGE) */
     val playbackBackgroundImageUri: String = "",
     /** Estilo de interfaz (tema) de la pantalla de reproducción */

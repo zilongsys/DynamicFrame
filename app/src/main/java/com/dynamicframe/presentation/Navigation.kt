@@ -86,10 +86,13 @@ fun DynamicFrameNavHost(
         }
     }
 
-    // Auto-arranque tras reinicio (Android TV): abre el slideshow a pantalla completa.
-    LaunchedEffect(autoStart) {
-        if (autoStart) {
+    // Auto-arranque: boot (TV) o "Iniciar en reproducción" (screenSaverMode).
+    var didAutoOpenPlayback by remember { mutableStateOf(false) }
+    LaunchedEffect(autoStart, settingsConfig.screenSaverMode) {
+        if (didAutoOpenPlayback) return@LaunchedEffect
+        if (autoStart || settingsConfig.screenSaverMode) {
             delay(800)
+            didAutoOpenPlayback = true
             openFullscreen()
         }
     }

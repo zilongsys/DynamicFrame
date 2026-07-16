@@ -4,7 +4,9 @@ import com.dynamicframe.domain.model.StorageRoot
 import com.dynamicframe.domain.model.StorageSubfolder
 import com.dynamicframe.domain.playback.SlideshowMusicCoordinator
 import com.dynamicframe.domain.repository.MusicPlaybackRepository
+import com.dynamicframe.domain.repository.SlideshowVideoPlayerRepository
 import com.dynamicframe.domain.repository.StorageBrowserRepository
+import com.dynamicframe.domain.repository.VideoBackdropPlayerRepository
 import com.dynamicframe.domain.repository.VideoThumbnailRepository
 import com.dynamicframe.domain.slideshow.SlideshowEngine
 import kotlinx.coroutines.flow.StateFlow
@@ -38,16 +40,22 @@ class ListStorageSubfoldersUseCase @Inject constructor(
 
 class PauseAppPlaybackUseCase @Inject constructor(
     private val slideshowEngine: SlideshowEngine,
-    private val musicCoordinator: SlideshowMusicCoordinator
+    private val musicCoordinator: SlideshowMusicCoordinator,
+    private val slideshowVideoPlayer: SlideshowVideoPlayerRepository,
+    private val videoBackdropPlayer: VideoBackdropPlayerRepository,
 ) {
     fun pauseAll() {
         slideshowEngine.pause()
         musicCoordinator.pause()
+        runCatching { slideshowVideoPlayer.stop() }
+        runCatching { videoBackdropPlayer.stop() }
     }
 
     fun disconnectAll() {
         slideshowEngine.pause()
         musicCoordinator.disconnect()
+        runCatching { slideshowVideoPlayer.stop() }
+        runCatching { videoBackdropPlayer.stop() }
     }
 }
 

@@ -17,9 +17,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -89,6 +94,26 @@ fun SlideshowScreen(
         viewModel.onSlideshowScreenVisible()
         onDispose {
             viewModel.stopSlideshow()
+        }
+    }
+
+    // Pantalla completa tipo marco: ocultar barras del sistema; restaurar al salir.
+    val activity = LocalContext.current as? Activity
+    val view = LocalView.current
+    DisposableEffect(Unit) {
+        val window = activity?.window
+        if (window == null) {
+            onDispose { }
+        } else {
+            val controller = WindowCompat.getInsetsController(window, view)
+            WindowCompat.setDecorFitsSystemWindows(window, false)
+            controller.hide(WindowInsetsCompat.Type.systemBars())
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            onDispose {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+                WindowCompat.setDecorFitsSystemWindows(window, true)
+            }
         }
     }
 
@@ -189,7 +214,10 @@ fun SlideshowScreen(
         }
     }
 
-    val showClock = config.playbackShowClock && (isParadise || controlsShown)
+    val showClock = config.playbackShowClock && (
+        if (config.playbackImmersiveMode) controlsShown
+        else (isParadise || controlsShown)
+    )
     val contentZoom = config.playbackContentZoom.coerceIn(0.75f, 1f)
 
     var currentTime by remember { mutableStateOf("") }
@@ -223,7 +251,10 @@ fun SlideshowScreen(
     // Necesita un FocusRequester independiente para que el D-pad entre en los IconButtons
     // cuando los controles aparecen tras pulsar OK.
     val paradiseFocus = remember { FocusRequester() }
-    val themeAlwaysVisible = !isParadise && config.playbackTheme != PlaybackTheme.AURORA_GLASS
+    val themeAlwaysVisible =
+        !isParadise &&
+            !config.playbackImmersiveMode &&
+            config.playbackTheme != PlaybackTheme.AURORA_GLASS
     val backgroundCapturesFocus = isTV && !controlsShown && !themeAlwaysVisible
     var backNavigationEnabled by remember { mutableStateOf(!isTV) }
 
@@ -378,7 +409,10 @@ fun SlideshowScreen(
                 slideshowState = slideshowState,
                 musicState = musicState,
                 weather = weatherInfo,
-                showDpadHint = isPresenting && !controlsShown && showParadiseDpadHint,
+                showDpadHint = isPresenting &&
+                    !controlsShown &&
+                    showParadiseDpadHint &&
+                    !config.playbackImmersiveMode,
                 isTV = isTV
             )
 
@@ -479,7 +513,7 @@ fun SlideshowScreen(
 
         if (!isParadise) {
         AnimatedVisibility(
-            visible = showThemeBadge,
+            visible = showThemeBadge && !config.playbackImmersiveMode,
             enter = fadeIn(androidx.compose.animation.core.tween(300)),
             exit = fadeOut(androidx.compose.animation.core.tween(400)),
             modifier = Modifier
@@ -526,8 +560,8 @@ fun SlideshowScreen(
             enter = fadeIn(androidx.compose.animation.core.tween(400)),
             exit = fadeOut(androidx.compose.animation.core.tween(400)),
             modifier = Modifier
-                .align(Alignment.TopCenter)
-                .padding(top = 16.dp)
+                .align(config.clockPosition.toAlignment())
+                .padding(config.clockPosition.toOverlayPadding())
         ) {
             when (config.playbackTheme) {
                 PlaybackTheme.AURORA_GLASS -> AuroraClockTop(

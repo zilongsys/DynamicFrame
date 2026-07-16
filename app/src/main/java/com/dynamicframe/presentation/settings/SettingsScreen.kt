@@ -396,6 +396,13 @@ fun SettingsScreen(
                             title = type.displayName(),
                             icon = Icons.Default.LibraryMusic,
                             checked = type in config.musicSourceTypes,
+                            note = when (type) {
+                                MusicSourceType.DEVICE_LIBRARY ->
+                                    "Usa la biblioteca de audio del dispositivo (MediaStore)."
+                                MusicSourceType.LOCAL_FOLDER ->
+                                    "Reproduce música solo de las carpetas que añadas abajo."
+                                else -> ""
+                            },
                             onCheckedChange = { viewModel.toggleMusicSource(type) }
                         )
                     }
@@ -405,7 +412,7 @@ fun SettingsScreen(
                             title = "${type.displayName()} (próximamente)",
                             icon = Icons.Default.LibraryMusic,
                             checked = false,
-                            note = "Disponible en una versión futura.",
+                            note = "No disponible aún; no afecta a la reproducción.",
                             enabled = false,
                             onCheckedChange = { }
                         )
@@ -439,38 +446,6 @@ fun SettingsScreen(
                                 onRemove = { viewModel.removeMusicFolder(uri) }
                             )
                         }
-                    }
-                    if (MusicSourceType.THEME in config.musicSourceTypes) {
-                        SettingsDropdownItem(
-                            title = "Tema / ambiente",
-                            icon = Icons.Default.Palette,
-                            currentValue = config.musicTheme.displayName(),
-                            options = MusicTheme.entries.map { it.displayName() },
-                            note = "Estilo musical generado para ambientar el slideshow.",
-                            onSelect = { idx ->
-                                viewModel.updateConfig(config.copy(musicTheme = MusicTheme.entries[idx]))
-                            }
-                        )
-                    }
-                    if (MusicSourceType.SPOTIFY in config.musicSourceTypes) {
-                        SettingsTextFieldItem(
-                            title = "URL playlist Spotify",
-                            value = config.spotifyPlaylistUrl,
-                            placeholder = "https://open.spotify.com/playlist/...",
-                            onValueChange = { viewModel.updateConfig(config.copy(spotifyPlaylistUrl = it)) }
-                        )
-                        Text("Reproducción Spotify: próximamente (requiere Premium).", fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
-                    }
-                    if (MusicSourceType.YOUTUBE in config.musicSourceTypes) {
-                        SettingsTextFieldItem(
-                            title = "URL lista YouTube",
-                            value = config.youtubePlaylistUrl,
-                            placeholder = "https://youtube.com/playlist?list=...",
-                            onValueChange = { viewModel.updateConfig(config.copy(youtubePlaylistUrl = it)) }
-                        )
-                        Text("Reproducción YouTube: próximamente.", fontSize = 11.sp,
-                            color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f))
                     }
                     SettingsDropdownItem(
                         title = "Música durante video",
@@ -659,7 +634,7 @@ fun SettingsScreen(
                         title = "Solo imagen (inmersivo)",
                         icon = Icons.Default.Fullscreen,
                         checked = config.playbackImmersiveMode,
-                        note = "Oculta todos los controles para máxima inmersión.",
+                        note = "Oculta barras del sistema y reduce overlays; OK/toque muestra controles.",
                         onCheckedChange = { viewModel.updateConfig(config.copy(playbackImmersiveMode = it)) }
                     )
                     SettingsSwitchItem(
@@ -758,8 +733,15 @@ fun SettingsScreen(
                         title = "Iniciar automáticamente al arrancar",
                         icon = Icons.Default.PowerSettingsNew,
                         checked = config.autoStartOnBoot,
-                        note = "Arranca el slideshow automáticamente al encender el dispositivo.",
+                        note = "Arranca el slideshow automáticamente al encender el dispositivo (TV).",
                         onCheckedChange = { viewModel.updateConfig(config.copy(autoStartOnBoot = it)) }
+                    )
+                    SettingsSwitchItem(
+                        title = "Iniciar en reproducción",
+                        icon = Icons.Default.PlayCircle,
+                        checked = config.screenSaverMode,
+                        note = "Al abrir la app va directo a pantalla completa (modo marco / screensaver).",
+                        onCheckedChange = { viewModel.updateConfig(config.copy(screenSaverMode = it)) }
                     )
                 }
             }

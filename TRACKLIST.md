@@ -1,5 +1,9 @@
 # DynamicFrame — Tracklist de peticiones
 
+## 2026-07-15 — Estabilizar marco digital / screensaver
+- Estado: Completado
+- Descripción: P0 lifecycle vídeo + await media + shuffle; inmersivo, clockPosition, iniciar-en-reproducción, defaults honestos.
+
 ## 2026-06-22 — Vídeos pausados con fondo estático
 - Estado: Completado
 - Descripción: Fix race isPlaying en SlideshowVideoPlayer; revertir audio focus dinámico en vídeo principal.

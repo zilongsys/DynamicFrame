@@ -302,6 +302,12 @@ class SlideshowViewModel @Inject constructor(
         runCatching { videoBackdropPlayer.stop() }
         fullscreenSessionActive = false
 
+        // Esperar carga de media (evita race con autostart / boot).
+        runCatching { slideshowEngine.initialize() }
+        if (slideshowState.value.playlistItems.isEmpty()) {
+            runCatching { slideshowEngine.loadMedia() }
+        }
+
         slideshowEngine.beginSession(startPaused = true)
         val state = slideshowState.value
         val item = state.currentItem

@@ -41,10 +41,10 @@ class SlideshowMusicCoordinator @Inject constructor(
 
             music.ensureConnected()
             if (freshSession) {
-                // Barajar la lista completa y empezar por el principio del orden ya barajado.
+                // Una sola estrategia: barajar la lista aquí; el player no vuelve a barajar.
                 val playlist = ordered(tracks, config.musicShuffle)
                 music.setPlaylist(playlist, startIndex = 0, autoPlay = true)
-                music.setShuffle(config.musicShuffle)
+                music.setShuffle(false)
             } else {
                 resumePlayback()
             }
@@ -70,7 +70,7 @@ class SlideshowMusicCoordinator @Inject constructor(
 
             if (playlistStale) {
                 music.setPlaylist(ordered(tracks, config.musicShuffle), autoPlay = true)
-                music.setShuffle(config.musicShuffle)
+                music.setShuffle(false)
             } else if (!current.isPlaying) {
                 music.play()
             }
@@ -96,7 +96,7 @@ class SlideshowMusicCoordinator @Inject constructor(
             if (!playbackAllowed) return@runCatching
             music.setPlaylist(ordered(tracks, config.musicShuffle), autoPlay = playAfter)
             music.setVolume(config.musicVolume)
-            music.setShuffle(config.musicShuffle)
+            music.setShuffle(false)
         }
     }
 

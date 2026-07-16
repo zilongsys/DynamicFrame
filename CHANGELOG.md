@@ -1,5 +1,22 @@
 # Changelog — DynamicFrame (MEMORIA)
 
+## v0.1.96
+
+### Añadido
+- **Iniciar en reproducción** (`screenSaverMode`): al abrir la app va directo a pantalla completa (modo marco).
+
+### Corregido
+- **Lifecycle**: al ir a background (`onStop`) también se detienen vídeo y backdrop (antes solo motor + música).
+- **Autostart / fullscreen**: espera `initialize`/`loadMedia` antes de `beginSession` (evita playlist vacía).
+- **Música aleatoria**: una sola baraja (ya no doble shuffle lista + ExoPlayer).
+- **Inmersivo**: oculta barras del sistema en slideshow; reduce overlays; Paradise respeta el flag.
+- **Posición del reloj**: `clockPosition` aplicado en overlays clásicos y Paradise.
+- **Ajustes honestos**: THEME/Spotify/YouTube solo como “próximamente”; fuentes implementadas con `note`.
+
+### Actualizado
+- Fondo letterbox por defecto: **Negro** (antes Lavanda demo).
+- Warm-up de `SettingsBootCache` al observar/leer config (BootReceiver más fiable).
+
 ## v0.1.95
 
 ### Corregido

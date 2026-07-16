@@ -28,13 +28,22 @@ class DataStoreSettingsRepository @Inject constructor(
 
     override fun observeConfig(): Flow<SlideshowConfig> =
         dataStore.data
-            .map { prefs -> prefs.toConfig().also { cachedConfig = it } }
+            .map { prefs ->
+                prefs.toConfig().also { config ->
+                    cachedConfig = config
+                    // Warm-up para BootReceiver (no solo al guardar).
+                    syncBootPreference(config.autoStartOnBoot)
+                }
+            }
             .catch {
                 emit(cachedConfig)
             }
 
     override suspend fun getConfig(): SlideshowConfig = runCatching {
-        dataStore.data.first().toConfig().also { cachedConfig = it }
+        dataStore.data.first().toConfig().also { config ->
+            cachedConfig = config
+            syncBootPreference(config.autoStartOnBoot)
+        }
     }.getOrElse { cachedConfig }
 
     override suspend fun saveConfig(config: SlideshowConfig) {
@@ -164,7 +173,11 @@ class DataStoreSettingsRepository @Inject constructor(
         disabledMusicFolderUris = splitSet(this[Keys.DISABLED_MUSIC_FOLDERS]),
         musicSourceTypes = splitSet(this[Keys.MUSIC_SOURCES]).mapNotNull {
             runCatching { MusicSourceType.valueOf(it) }.getOrNull()
-        }.toSet().ifEmpty { setOf(enumOrDefault(this[Keys.MUSIC_SOURCE], MusicSourceType.DEVICE_LIBRARY)) },
+        }.filter {
+            it == MusicSourceType.DEVICE_LIBRARY || it == MusicSourceType.LOCAL_FOLDER
+        }.toSet().ifEmpty {
+            setOf(enumOrDefault(this[Keys.MUSIC_SOURCE], MusicSourceType.DEVICE_LIBRARY))
+        },
         // musicSourceType is computed from musicSourceTypes
         musicFolderUris = resolveMusicFolders(this),
         musicTheme = enumOrDefault(this[Keys.MUSIC_THEME], MusicTheme.RELAX),
@@ -183,7 +196,7 @@ class DataStoreSettingsRepository @Inject constructor(
         playbackShowSafeBorder = this[Keys.PLAYBACK_SAFE_BORDER] ?: false,
         playbackPictureFrameScale = this[Keys.PLAYBACK_FRAME_SCALE] ?: 1.0f,
         playbackContentZoom = this[Keys.PLAYBACK_CONTENT_ZOOM] ?: 1.0f,
-        playbackBackgroundType = enumOrDefault(this[Keys.PLAYBACK_BACKGROUND], PlaybackBackgroundType.DEMO_LAVENDER),
+        playbackBackgroundType = enumOrDefault(this[Keys.PLAYBACK_BACKGROUND], PlaybackBackgroundType.BLACK),
         playbackBackgroundImageUri = this[Keys.PLAYBACK_BACKGROUND_IMAGE] ?: "",
         playbackTheme = enumOrDefault(this[Keys.PLAYBACK_THEME], PlaybackTheme.AURORA_GLASS),
         appTheme = enumOrDefault(this[Keys.APP_THEME], AppTheme.DEFAULT)
